@@ -1,0 +1,23 @@
+function convert_image {
+    # usage: convert 
+    #env convert $* -i - -o -
+    echo convert
+}
+
+function convert_movie {
+    echo convert_movie
+}
+
+function trim_movie {
+    echo trim_movie
+}
+
+function split_pdf {
+    echo split_pdf
+}
+
+function create_manifest {
+    echo create_manifest
+}
+
+
