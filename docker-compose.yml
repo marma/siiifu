@@ -1,0 +1,33 @@
+version: "3.0"
+
+services:
+    web:
+        restart: always
+        build: ./web
+        environment:
+            - HTTP_PROXY=http://ats:3128
+            - HTTPS_PROXY=http://ats:1080
+        expose:
+            - 5000
+        command: /usr/local/bin/gunicorn --pythonpath /app -b :5000 siiifu:app
+
+    nginx:
+        restart: always
+        build: ./nginx/
+        expose:
+            - 8080
+        volumes:
+            - ./web/static:/www/static
+        links:
+            - web:web
+
+    ats:
+        restart: always
+        build: ./ats/
+        expose:
+            - 3128
+            - 1080
+            - 8888
+        ports:
+            - 8888:8888
+
