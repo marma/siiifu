@@ -67,11 +67,14 @@ class run():
         assert self._err_text == None
         return self.iter_err(chunk_size, mode='s')
 
-    # TODO: handle multi-byte Unicode sequence on chunk boundary in string mode
     def iter_stream(self, s, mode='b', chunk_size=4096):
         assert mode in [ 'b', 's' ]
         b = s.read(chunk_size)
         while b != b'':
+            # handle multi-byte Unicode sequence on chunk boundary in string mode
+            while s.peek(1) != b'' and s.peek(1)[0] > 0x7f:
+                b += s.read(1)
+
             yield b if mode == 'b' else b.decode('utf-8')
             b = s.read(chunk_size)
 
