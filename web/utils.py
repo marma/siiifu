@@ -110,6 +110,10 @@ class pipe(Thread):
         elif isinstance(i, list) or isinstance(i, Iterator) or isinstance(i, Generator):
             for chunk in i:
                 o.write(chunk)
+        else:
+            # try to create an iterator *roll-eyes*
+            for chunk in iter(i):
+                o.write(chunk)
 
         o.close()
 
