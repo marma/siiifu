@@ -16,7 +16,7 @@ A Dockerized IIIF server relying heavily on ATS for caching both results and und
                               |  ^
                               4  |
                               |  5
-                             v  |
+                              v  |
                           ------------
                           |          |
                           | resource |
