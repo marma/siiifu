@@ -24,7 +24,7 @@ def image(prefix, identifier, region, size, rotation, quality, format):
 
     assert format in [ 'jpg', 'png', 'jp2', 'tif', 'gif' ]
     
-    runstr = 'convert {options} - {format}:-'
+    runstr = 'convert - {options} {format}:-'
     options = [ ]
 
     # check url
@@ -39,8 +39,18 @@ def image(prefix, identifier, region, size, rotation, quality, format):
 
     # region
     if region != 'full':
-       pass 
-
+        if region == 'square':
+            options += [ '-set', 'option:size', '%[fx:min(w,h)]x%[fx:min(w,h)]', 'xc:none', '+swap', '-gravity', 'center', '-composite' ]
+        elif region[:4] == 'pct:':
+            # bug - offsets still in pixels
+            s = [ float(x) for x in region.split(',') ]
+            assert len(s) == 4
+            options += [ '-crop', '%%%fx%f+%f+%f' % (s[2], s[3], s[0], s[1]) ] 
+        else:
+            s = [ int(x) for x in region.split(',') ]
+            assert len(s) == 4
+            options += [ '-crop', '%dx%d+%d+%d' % (s[2], s[3], s[0], s[1]) ]
+            
     # size
     if size not in [ 'full', 'max' ]:
         if size[:4] == 'pct:':
@@ -53,7 +63,8 @@ def image(prefix, identifier, region, size, rotation, quality, format):
 
     # rotation
     if rotation != "0":
-        if format in [ 'png', 'gif' ]:
+        # bug - bitonal does not work with transparency
+        if format in [ 'png', 'gif' ] and quality != 'bitonal':
             options += [ '-background', 'transparent' ]
 
         options += [ '-rotate', str(float(rotation)) ]
