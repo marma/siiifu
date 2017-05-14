@@ -4,19 +4,23 @@ from sys import stdin,stdout,stderr
 from requests import get
 from flask import Flask,Response
 from yaml import load
-from utils import trun
+from utils import run
 from urllib.parse import urlparse
+from contextlib import closing
 
 app = Flask(__name__)
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 config = load('config.yml')
 mimes = { 'jp2': 'image/jp2', 'png': 'image/png', 'jpg': 'image/jpg', 'gif': 'image/gif' }
 
+def create_response(identifier, runstr, mimetype):
+    return Response(run(runstr, get(identifier, stream=True).iter_content(100*1024), ignore_err=True), mimetype=mimetype)
+
 
 # IIIF Image 2.1
 @app.route('/<prefix>/<path:identifier>/<region>/<size>/<rotation>/<quality>.<format>')
 def image(prefix, identifier, region, size, rotation, quality, format):
-    print(' / '.join([ prefix, identifier, region, size, str(rotation), quality, format ]), flush=True)
+    print(' / '.join([ prefix, identifier, region, size, rotation, quality, format ]), flush=True)
 
     assert format in [ 'jpg', 'png', 'jp2', 'tif', 'gif' ]
     
@@ -28,7 +32,7 @@ def image(prefix, identifier, region, size, rotation, quality, format):
 
     # short curcuit?
     if region == 'full' and size in [ 'full', 'max' ] \
-       and rotation == 0 and quality == 'default' \
+       and rotation == "0" and quality == 'default' \
        and identifier.split('.')[-1] == format:
            #runstr = 'cat'
            pass
@@ -43,24 +47,29 @@ def image(prefix, identifier, region, size, rotation, quality, format):
             assert float(size[4:]) <= 100.0
             options += [ '-resize', size[4:] + '%' ]
         else:
-            assert size != ',' and len(size.split(',')) == 2
-            options += [ '-resize', '\!' + size.replace(',', 'x') + '\>' ]
+            s = size.split(',')
+            assert size != ',' and len(s) == 2
+            options += [ '-resize', ('\\!' if s[0] != '' and s[1] != '' else '') + size.replace(',', 'x') + '\\>' ]
 
     # rotation
-    if rotation != 0:
-        pass
+    if rotation != "0":
+        if format in [ 'png', 'gif' ]:
+            options += [ '-background', 'transparent' ]
+
+        options += [ '-rotate', str(float(rotation)) ]
 
     # quality
-    if quality != 'default':
-        pass
+    if quality not in [ 'default', 'color' ]:
+        if quality == 'gray':
+            options +=  [ '-colorspace', 'gray' ]
+        elif quality == 'bitonal':
+            options += [ '-threshold', '50%' ]
 
-    print(runstr.format(format=format, options=' '.join(options)), flush=True)
+    runstr = runstr.format(format=format, options=' '.join(options))
 
-    return Response(
-              #trun('cat', identifier),
-              trun(runstr.format(format=format, options=' '.join(options)),
-                   identifier),
-              mimetype=mimes[format])
+    print(runstr, flush=True)
+
+    return create_response(identifier, runstr, mimetype=mimes[format])
 
 
 # IIIF Image 2.1
@@ -85,11 +94,6 @@ def page(prefix, identifier, page):
 
     # get document
     (stream, headers) = get(p['prefix'] + identifier + p['suffix'])
-
-
-# Get resource
-def get(uri):
-    pass
 
 
 if __name__ == '__main__':
