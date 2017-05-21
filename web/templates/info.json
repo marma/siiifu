@@ -1,0 +1,9 @@
+{
+    "@context": "http://iiif.io/api/image/2/context.json",
+    "@id": "{{ id }}",
+    "@type": "iiif:Image",
+    "protocol": "http://iiif.io/api/image",
+    "profile": "http://iiif.io/api/image/2/level2.json",
+    "width": "{{ info['width'] }}",
+    "height": "{{ info['height'] }}"
+}

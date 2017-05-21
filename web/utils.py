@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 
 from collections import Iterator,Generator
-from subprocess import Popen,PIPE
+from subprocess import Popen,PIPE,DEVNULL
 from sys import stdin, stdout, stderr
 from shlex import split
 from select import select
 from threading import Thread
 from io import IOBase
+from werkzeug.routing import BaseConverter
 
 class run():
     debug=True
@@ -15,7 +16,7 @@ class run():
         debug('run init')
         self.default_buf_size=100*1024
         self.ignore_err = ignore_err
-        self.p = Popen(split(cmd), stdin=None or PIPE, stdout=PIPE, stderr=PIPE if not ignore_err else None)
+        self.p = Popen(split(cmd), stdin=None or PIPE, stdout=PIPE, stderr=DEVNULL if ignore_err else PIPE)
         self._out = None
         self._err = None
         self._text = None
@@ -139,8 +140,29 @@ class iterstream():
         self.it = iter(it)
         self.buf = None
         self.mode = 's'
+        self.p=0
+
+
+    def seek(self, i):
+        print('Seeking to %d' % i, file=stderr)
+        if i < self.p:
+            raise Exception('Cannot seek: %d < %d' % (i, self.p))
+
+        while self.p < i:
+            b = self.read(min(10*1024, i - self.p))
+
+            if len(b) == 0:
+                raise Exception('Cannot seek past end of stream: %d > %d' % (i, self.p))
+
+
+    def tell(self):
+        return self.p
+
 
     def read(self, n=None):
+        return self._read(n)
+
+    def _read(self, n=None):
         assert n == None or n >= 0
 
         l = [ self.buf ] if self.buf else []
@@ -167,9 +189,27 @@ class iterstream():
         l += [ x[:a] ]
         self.buf = x[a:]
 
+        self.p += n
+
         return ''.join(l) if self.mode == 's' else b''.join(l)
+
 
 def debug(*args, **kwargs):
     if run.debug:
         print('debug:', *args, **kwargs, file=stderr, flush=True)
+
+
+def create_response(identifier, runstr, mimetype):
+    return Response(
+            run(
+                runstr,
+                get(identifier, stream=True).iter_content(100*1024),
+                ignore_err=True),
+            mimetype=mimetype)
+
+class RegexConverter(BaseConverter):
+    def __init__(self, url_map, *items):
+        super(RegexConverter, self).__init__(url_map)
+        self.regex = items[0]
+
 
