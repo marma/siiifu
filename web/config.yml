@@ -1,0 +1,17 @@
+cache:
+    root: /tmp/cache
+
+prefixes:
+    any:
+        identifier_prefix: ''
+        identifier_postfix: ''
+    
+        allowed_schemas:
+            - http
+            - https
+
+        supported_formats:
+            - jpg
+            - png
+            - gif
+
