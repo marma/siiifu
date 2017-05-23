@@ -3,8 +3,10 @@
 from flask import Flask,Response,render_template,request
 from flask_api.exceptions import APIException
 from yaml import load
-from data import validate,require,info,mimes,resolve
+from image import get_image,get_info,mimes
+from data import validate,resolve
 from utils import RegexConverter
+from cache import Cache
 
 app = Flask(__name__)
 app.config['TEMPLATES_AUTO_RELOAD'] = True
@@ -23,12 +25,13 @@ def info_json(prefix, identifier):
             render_template(
                 'info.json',
                 id='/'.join(request.url.split('/')[:-1]),
-                info=info(url)),
+                info=get_info(url)),
             mimetype='application/ld+json')
 
 
 # IIIF Image 2.1
-@app.route('/<prefix>/<path:identifier>/<region>/<size>/<rotation>/<quality>.<regex("^((?!json).*)$"):format>')
+#@app.route('/<prefix>/<path:identifier>/<region>/<size>/<rotation>/<quality>.<regex("^((?!json).*)$"):format>')
+@app.route('/<prefix>/<path:identifier>/<region>/<size>/<rotation>/<quality>.<format>')
 def image(prefix, identifier, region, size, rotation, quality, format):
     print(prefix, identifier, region, size, rotation, quality, format)
     prefix = config['prefixes'][prefix]
@@ -36,14 +39,14 @@ def image(prefix, identifier, region, size, rotation, quality, format):
     validate(prefix, url, region, size, rotation, quality, format)
 
     return Response(
-            require(
+            get_image(
+                prefix,
                 url,
                 region,
                 size,
                 rotation,
                 quality,
-                format,
-                params=request.args),
+                format),
             mimetype=mimes[format])
 
 

@@ -16,7 +16,7 @@ class run():
         debug('run init')
         self.default_buf_size=100*1024
         self.ignore_err = ignore_err
-        self.p = Popen(split(cmd), stdin=None or PIPE, stdout=PIPE, stderr=DEVNULL if ignore_err else PIPE)
+        self.p = Popen(split(cmd), stdin=PIPE if input else None, stdout=PIPE, stderr=None if ignore_err else PIPE)
         self._out = None
         self._err = None
         self._text = None

@@ -19,11 +19,12 @@ class Cache():
 
 
     def set(self, key, data, info={}):
+        print('CACHE set: %s' % key)
         try:
             for chunk in self._set(key, data, info):
-                ret = chunk[1]
+                pass
 
-            return ret
+            return self.lookup(key)
         except Exception as e:
             try:
                 self.delete(key)
@@ -34,6 +35,7 @@ class Cache():
 
 
     def iter_set(self, key, data, info={}, chunk_size=100*1024):
+        print('CACHE iter_set %s' % key)
         return self._set(key, data, info, chunk_size)
 
 
@@ -60,10 +62,10 @@ class Cache():
             if isinstance(data, str):
                 d['mode'] = 's'
                 f.write(data.encode('utf-8'))
-                yield (data, d)
+                yield data
             elif isinstance(data, bytes):
                 f.write(data)
-                yield (data, d)
+                yield data
             elif isinstance(data, Iterator):
                 for b in data:
                     if isinstance(b, str):
@@ -73,7 +75,7 @@ class Cache():
                     else:
                         f.write(b)
 
-                    yield (b, d)
+                    yield b
             elif isinstance(data, IOBase):
                 b=data.read(chunk_size)
                 while len(b) != 0:
@@ -84,7 +86,7 @@ class Cache():
                     else:
                         f.write(b)
 
-                    yield (b, d)
+                    yield b
             else:
                 raise Exception('Unexpected type for data (%s)', str(type(data)))
  
@@ -94,19 +96,22 @@ class Cache():
 
 
     def get(self, key):
-        fname = self.filename(key)
+        print('get %s' % key)
 
-        if exists(fname + '.json'):
+        if key in self:
+            fname = self.filename(key)
+
             with open(fname + '.json') as fh:
                 info = load(fh)
 
                 with open(fname, mode='rb' if info['mode'] == 'b' else 'r') as f:
-                    return (f.read(), info)
+                    return f.read()
         else:
             return None
 
 
     def iter_get(self, key, chunk_size=100*1024):
+        print('iter_get %s' % key)
         fname = self.filename(key)
 
         if exists(fname + '.json'):
@@ -116,9 +121,31 @@ class Cache():
                 with open(self.filename(key), mode='rb' if info['mode'] == 'b' else 'r') as f:
                     b=f.read(chunk_size)
                     while len(b) != 0:
-                        yield (b, info)
+                        yield b
                         b=f.read(chunk_size)
 
+    def getfile(self, key):
+        if key in self :
+            return self.filename(key)
+        else:
+            return None
+
+
+    def __contains__(self, key):
+        if exists(self.filename(key) + '.json'):
+            print('CACHE HIT: %s' % key)
+            return True
+        else:
+            print('CACHE MISS: %s' % key)
+            return False
+
+    
+    def lookup(self, key):
+        if key in self:
+            with open(self.filename(key) + '.json') as f:
+                return load(f)
+        else:
+            return None
 
     def delete(self, key):
         fname = self.filename(key)

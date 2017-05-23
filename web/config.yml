@@ -1,5 +1,8 @@
+tiling:
+    tile_size: 256
+
 cache:
-    root: /tmp/cache
+    base: /tmp/cache
 
 prefixes:
     any:

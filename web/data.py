@@ -1,28 +1,5 @@
 from re import match
 from urllib import parse
-from PIL import Image,ImageFile
-from requests import get
-from contextlib import closing
-from utils import run
-from magic import Magic
-from config import cache
-
-mimes = { 'jp2': 'image/jp2', 'png': 'image/png', 'jpg': 'image/jpg', 'gif': 'image/gif', 'json': 'application/json', 'json-ld': 'application/ld+json' }
-
-# does not work with files that need the whole file read for identification
-def info(url):
-    with closing(get(url, stream=True)) as r:
-        b = next(r.iter_content(50*1024))
-        p = run('identify -' , b, ignore_err=True)
-        print(p.text)
-
-        s = p.text.split()
-
-        return { 'format': s[1], 'width': s[2].split('x')[0], 'height': s[2].split('x')[1] }
-
-
-def acquire(prefix, url, region, scale, rotation, quality, format):
-    ret = 
 
 def validate(prefix, url, region, scale, rotation, quality, format):
     scheme = parse.urlsplit(url).scheme
