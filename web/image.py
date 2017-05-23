@@ -111,10 +111,6 @@ def create_image(prefix, url, region, scale, rotation, quality, format):
 
     runstr = runstr.format(format=format, options=' '.join(options))    
    
-    # find the optimal source image
-    ...
- 
-    # is there a full JPEG-version in the cache?
     jfkey = create_key(url, 'full', 'max', '0', 'default', 'jpg')
     if jfkey in cache:
         # get full JPEG image from cache
@@ -141,7 +137,7 @@ def create_image(prefix, url, region, scale, rotation, quality, format):
                                     jfkey,
                                     run('gm convert - -depth 8 -quality 90 jpg:-',
                                         r.iter_content(100*1024),
-                                        ignore_err=True)).iter_out(100*1024)))
+                                        ignore_err=True).iter_out(100*1024))).iter_out(100*1024))
 
 
 def create_key(url, region, scale, rotation, quality, format):

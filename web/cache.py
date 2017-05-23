@@ -133,10 +133,10 @@ class Cache():
 
     def __contains__(self, key):
         if exists(self.filename(key) + '.json'):
-            print('CACHE HIT: %s' % key)
+            print('LOOKUP HIT: %s' % key)
             return True
         else:
-            print('CACHE MISS: %s' % key)
+            print('LOOKUP MISS: %s' % key)
             return False
 
     

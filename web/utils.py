@@ -10,7 +10,7 @@ from io import IOBase
 from werkzeug.routing import BaseConverter
 
 class run():
-    debug=True
+    debug=False
 
     def __init__(self, cmd, input=None, ignore_err=False):
         debug('run init')

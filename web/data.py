@@ -6,11 +6,11 @@ def validate(prefix, url, region, scale, rotation, quality, format):
     if scheme not in prefix.get('allowed_schemas', []):
         raise Exception('Scheme \'%s\' not supported' % scheme, 400)
 
-    region_re='full|square|pct:{f},{f},{f},{f}|{d},{d},{d},{d}'.format(f='\\d+(\\.\\d+)?', d='\\d+')
+    region_re='^(full|square|pct:{f},{f},{f},{f}|{d},{d},{d},{d})$'.format(f='\\d+(\\.\\d+)?', d='\\d+')
     if not match(region_re, region):
         raise Exception('%s not a valid region' % region, 400)
     
-    scale_match=match('(full)|(max)|(\\d+)?,(\\d+)?', scale)
+    scale_match=match('^(full|max|{d}*,{d}*|pct:{f})$'.format(d='\\d', f='\\d+(\\.\\d+)?'), scale)
     if not scale_match or scale_match[0] == ',':
         raise Exception('%s not a valid scale' % scale, 400)
 
