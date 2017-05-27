@@ -141,8 +141,8 @@ def create_image(prefix, url, region, scale, rotation, quality, format):
 
 
 def create_key(url, region, scale, rotation, quality, format):
-    if scale == 'full':
-        scale = 'max'
+    scale = 'max' if scale == 'full' else scale
+    quality = 'default' if quality == 'color' else quality
 
     return ':'.join((url, region, scale, rotation, quality, format))
 
