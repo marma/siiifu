@@ -5,29 +5,26 @@ services:
         restart: always
         build: ./web
         environment:
-            - HTTP_PROXY=http://ats:3128
-            - HTTPS_PROXY=http://ats:1080
+            - FLASK_DEBUG=1
+            - FLASK_APP=/app/siiifu.py
         expose:
             - 5000
-        command: /usr/local/bin/gunicorn --pythonpath /app -b :5000 siiifu:app
+        ports:
+            - 5000:5000
+        volumes:
+            - ./web:/app
+        command: flask run --host 0.0.0.0
+
 
     nginx:
         restart: always
         build: ./nginx/
         expose:
             - 8080
+        ports:
+            - 8080:8080
         volumes:
             - ./web/static:/www/static
         links:
             - web:web
-
-    ats:
-        restart: always
-        build: ./ats/
-        expose:
-            - 3128
-            - 1080
-            - 8888
-        ports:
-            - 8888:8888
 

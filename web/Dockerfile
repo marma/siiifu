@@ -38,7 +38,6 @@ RUN pip3 install --no-cache-dir -r /requirements.txt
 EXPOSE 5000
 
 ADD . /app
-#COPY bash_aliases /root/.bash_aliases
-#RUN . /root/.bash_aliases
+COPY config.yml /
  
-CMD /usr/local/bin/gunicorn --pythonpath /app -b :5000 siifu:app
+CMD /usr/local/bin/gunicorn --pythonpath /app -b :5000 siiifu:app

@@ -14,12 +14,14 @@ from os import makedirs
 from datetime import datetime
 
 class Cache():
+    debug = False
+
     def __init__(self, base):
         self.base=base
 
 
     def set(self, key, data, info={}):
-        print('CACHE set: %s' % key)
+        self.pdebug('set: %s' % key)
         try:
             for chunk in self._set(key, data, info):
                 pass
@@ -35,7 +37,7 @@ class Cache():
 
 
     def iter_set(self, key, data, info={}, chunk_size=100*1024):
-        print('CACHE iter_set %s' % key)
+        self.pdebug('iter_set %s' % key)
         return self._set(key, data, info, chunk_size)
 
 
@@ -96,7 +98,7 @@ class Cache():
 
 
     def get(self, key):
-        print('get %s' % key)
+        self.pdebug('get %s' % key)
 
         if key in self:
             fname = self.filename(key)
@@ -111,7 +113,7 @@ class Cache():
 
 
     def iter_get(self, key, chunk_size=100*1024):
-        print('iter_get %s' % key)
+        self.pdebug('iter_get %s' % key)
         fname = self.filename(key)
 
         if exists(fname + '.json'):
@@ -133,10 +135,10 @@ class Cache():
 
     def __contains__(self, key):
         if exists(self.filename(key) + '.json'):
-            print('LOOKUP HIT: %s' % key)
+            self.pdebug('LOOKUP HIT: %s' % key)
             return True
         else:
-            print('LOOKUP MISS: %s' % key)
+            self.pdebug('LOOKUP MISS: %s' % key)
             return False
 
     
@@ -162,3 +164,6 @@ class Cache():
 
         return '/'.join([ self.base ] + [ hex[ 2*i:2*i+2 ] for i in range(0,4) ] + [ hex ])
 
+    def pdebug(self, *args):
+        if self.debug:
+            print('CACHE', *args, file=stderr, flush=True)
