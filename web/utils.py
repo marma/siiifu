@@ -36,6 +36,10 @@ class run():
         return self._out
 
     @property
+    def stdout(self):
+        return self.p.stdout
+    
+    @property
     def text(self):
         if not self._text:
             self._text = self.out.decode('utf-8')
@@ -117,7 +121,7 @@ class pipe(Thread):
         elif isinstance(i, IOBase):
             b = i.read(self.chunk_size)
             while b not in [ b'', '' ]:
-                debug('pipe run iter() chunk', len(chunk), flush=True)
+                debug('pipe run iter() chunk', len(b), flush=True)
                 o.write(b if isinstance(b, bytes) else b.encode('utf-8'))
                 b = i.read(self.chunk_size)
         elif isinstance(i, list) or isinstance(i, Iterator) or isinstance(i, Generator):

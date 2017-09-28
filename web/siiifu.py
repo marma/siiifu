@@ -56,15 +56,31 @@ def image(prefix, identifier, region, size, rotation, quality, format):
 
 
 # Manifest creation
+@app.route('/<prefix>/<path:identifier>/manifest')
+def manifest(prefix, identifier):
+    p = config['prefixes'][prefix]
+    url = resolve(p, identifier)
+
+    r = make_response(
+            render_template(
+                'manifest_single.json',
+                url=url,
+                url_quoted=quote(url, safe='')))
+
+    r.headers['Access-Control-Allow-Origin'] = '*'
+    r.headers['Content-Type'] = 'application/json'
+
+    return r
+
 @app.route('/<prefix>/static/<path:f>')
-def manifest(prefix, f):
+def static_file(prefix, f):
     r = make_response(send_from_directory('static/', f))
     r.headers['Access-Control-Allow-Origin'] = '*'
-        
+
     return r
 
 
 if __name__ == '__main__':
     app.debug=True
-    app.run(host='0.0.0.0', threaded=True)
+    app.run(host='0.0.0.0', port=5000, threaded=True)
 

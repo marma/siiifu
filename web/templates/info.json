@@ -1,9 +1,18 @@
 {
     "@context": "http://iiif.io/api/image/2/context.json",
-    "@id": "{{ id }}",
+    "@id": "{{ id | safe }}",
     "@type": "iiif:Image",
     "protocol": "http://iiif.io/api/image",
-    "profile": "http://iiif.io/api/image/2/level2.json",
-    "width": "{{ info['width'] }}",
-    "height": "{{ info['height'] }}"
+    "width": {{ info['width'] }},
+    "height": {{ info['height'] }},
+    "tiles": [ { "width" : 256, "height" : 256, "scaleFactors" : [ 1,2,4,8,16 ] } ],
+    "sizes": [ {"width": 715, "height": 1000}, {"width": 286, "height": 400}, {"width": 143, "height": 200}, {"width": 72, "height": 100} ],
+    "profile" : [
+        "http://iiif.io/api/image/2/level1.json",
+        {
+            "formats" : [ "jpg" ],
+            "qualities" : [ "native","color","gray" ],
+            "supports" : ["regionByPct","sizeByForcedWh","sizeByWh","sizeAboveFull","rotationBy90s","mirroring","gray"]
+        }
+    ]
 }

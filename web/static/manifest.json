@@ -1,47 +1,30 @@
 {
-  "@context": "http://iiif.io/api/presentation/2/context.json",
-  "@id": "http://example.org/my_book",
-  "@type": "sc:Manifest",
-  "label": "My Book",
-  "thumbnail": "http://web:5000/any/https%3A%2F%2Fc1.staticflickr.com%2F1%2F332%2F32351801410_eccffc78a7_o.jpg/full/512,/0/default.jpg",
-  "viewingHint": "paged",
-  "metadata": [
-    {
-      "Foo": "Bar"
-    },
-    {
-      "Bazzers": [
-        "Quux",
-        "Corge"
-      ]
-    }
-  ],
+  "@context": "http://iiif.io/api/presentation/2/context.json", 
+  "@id": "http://iiif.io/api/presentation/2.0/example/fixtures/1/manifest.json", 
+  "@type": "sc:Manifest", 
+  "label": "Test 1 Manifest: Minimum Required Fields", 
+  "within": "http://iiif.io/api/presentation/2.0/example/fixtures/collection.json", 
   "sequences": [
     {
-      "@type": "sc:Sequence",
+      "@type": "sc:Sequence", 
       "canvases": [
         {
-          "@id": "http://web:5000/any/https%3A%2F%2Fc1.staticflickr.com%2F1%2F332%2F32351801410_eccffc78a7_o.jpg",
-          "@type": "sc:Canvas",
-          "label": "Page 1",
-          "width": 5523,
-          "height": 3686,
+          "@id": "http://iiif.io/api/presentation/2.0/example/fixtures/canvas/1/c1.json", 
+          "@type": "sc:Canvas", 
+          "label": "Test 1 Canvas: 1", 
+          "height": 1800, 
+          "width": 1200, 
           "images": [
             {
-              "@type": "oa:Annotation",
-              "motivation": "sc:painting",
+              "@type": "oa:Annotation", 
+              "motivation": "sc:painting", 
               "resource": {
-                "@id": "http://libimages1.princeton.edu/loris/pudl0001%2F4609321%2Fs42%2F00000006.jp2/full/512,/0/default.jpg",
-                "@type": "dcterms:Image",
-                "format": "image/jpeg",
-                "width": 5523,
-                "height": 3686,
-                "service": {
-                  "@context": "http://iiif.io/api/image/2/context.json",
-                  "@id": "http://web:5000/any/https%3A%2F%2Fc1.staticflickr.com%2F1%2F332%2F32351801410_eccffc78a7_o.jpg",
-                  "profile": "http://iiif.io/api/image/2/level2.json"
-                }
-              }
+                "@id": "http://iiif.io/api/presentation/2.0/example/fixtures/resources/page1-full.png", 
+                "@type": "dctypes:Image", 
+                "height": 1800, 
+                "width": 1200
+              }, 
+              "on": "http://iiif.io/api/presentation/2.0/example/fixtures/canvas/1/c1.json"
             }
           ]
         }
@@ -49,3 +32,4 @@
     }
   ]
 }
+

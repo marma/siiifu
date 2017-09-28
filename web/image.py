@@ -3,7 +3,7 @@ from urllib import parse
 from PIL import Image,ImageFile,ImageFilter
 from requests import get
 from contextlib import closing
-from utils import run
+from utils import run,iterstream
 from caching import cache
 from json import dumps,loads
 from flask_api.exceptions import NotFound
@@ -40,9 +40,10 @@ def _get_image(url):
         else:
             print('_icache miss')
 
-        r = get(url, stream=True)
-        r.raw.decode_stream=True
-        _icache[url] = Image.open(r.raw)
+        req = get(url, stream=True)
+        req.raw.decode_stream=True
+        r = run('gm convert - -depth 8 tif:-', req.raw, ignore_err=True)
+        _icache[url] = Image.open(r.stdout)
 
         return _icache[url]
 
@@ -57,8 +58,14 @@ def get_info(url):
         else:
             with closing(get(url, stream=True)) as r:
                 b = next(r.iter_content(50*1024))
-                p = run('identify -' , b, ignore_err=True)
+                p = run('gm identify -' , b, ignore_err=True)
                 s = p.text.split()
+
+            if len(s) == 0:
+                # get the whole file, which might take some time
+                with closing(get(url, stream=True)) as r:
+                    p = run('gm identify -' , r.iter_content(100*1024), ignore_err=True)
+                    s = p.text.split()
 
             ret = { 'format': s[1], 'width': s[2].split('x')[0], 'height': s[2].split('x')[1].split('+')[0] }
             cache.set(key, dumps(ret))
@@ -145,7 +152,8 @@ def create_image(image, info, prefix, url, region, scale, rotation, quality, for
             image = image.filter(ImageFilter.FIND_EDGES)
 
     b = BytesIO()
-    image.save(b, quality=90, progressive=True, format='jpeg' if format == 'jpg' else format)
+    icc_profile = image.info.get("icc_profile")
+    image.save(b, quality=90, icc_profile=icc_profile, progressive=True, format='jpeg' if format == 'jpg' else format)
 
     return b.getvalue()
 
