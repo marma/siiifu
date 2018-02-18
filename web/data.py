@@ -3,7 +3,8 @@ from urllib import parse
 
 def validate(prefix, url, region, scale, rotation, quality, format):
     scheme = parse.urlsplit(url).scheme
-    if scheme not in prefix.get('allowed_schemas', []):
+
+    if scheme not in prefix.get('allowed_schemas', [ 'http', 'https' ]):
         raise Exception('Scheme \'%s\' not supported' % scheme, 400)
 
     region_re='^(full|square|pct:{f},{f},{f},{f}|{d},{d},{d},{d})$'.format(f='\\d+(\\.\\d+)?', d='\\d+')
@@ -22,7 +23,7 @@ def validate(prefix, url, region, scale, rotation, quality, format):
     if quality not in [ 'default', 'color', 'gray', 'bitonal', 'edge' ]:
         raise Exception('%s not a valid quality' % quality, 400)
 
-    if format not in prefix.get('supported_formats', []):
+    if format not in prefix.get('supported_formats', [ 'jpg' ]):
         raise Exception('Format \'%s\' not supported' % format, 400)
 
     return True

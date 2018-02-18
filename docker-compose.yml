@@ -5,7 +5,7 @@ services:
         restart: always
         build: ./web
         environment:
-            - FLASK_DEBUG=1
+            - FLASK_DEBUG=0
             - FLASK_APP=/app/siiifu.py
         expose:
             - 5000
@@ -13,6 +13,23 @@ services:
             - 5000:5000
         volumes:
             - ./web:/app
+            - cache-volume:/data/cache
+        command: flask run --host 0.0.0.0
+
+
+    worker:
+        restart: always
+        build: ./web
+        environment:
+            - FLASK_DEBUG=0
+            - FLASK_APP=/app/image.py
+        expose:
+            - 5000
+        ports:
+            - 5001:5000
+        volumes:
+            - ./web:/app
+            - cache-volume:/data/cache
         command: flask run --host 0.0.0.0
 
 
@@ -25,6 +42,10 @@ services:
             - 8080:8080
         volumes:
             - ./web/static:/www/static
+            - cache-volume:/data/cache
         links:
             - web:web
+
+volumes:
+    cache-volume:
 

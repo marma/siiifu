@@ -6,6 +6,7 @@ from sys import argv,stdin
 
 def split(fname, dir, min_n):
     with Image.open(fname) as i:
+        print(i)
         max_n=int(min(log2(i.width), log2(i.height)))
 
         for n in reversed(range(min_n, max_n+1)):
@@ -23,8 +24,8 @@ def split(fname, dir, min_n):
                            offset_y, 
                            width, 
                            height, 
-                           #i.crop((offset_x, offset_y, offset_x + width-1, offset_y + height-1)).resize((int((2**min_n * width)/size), int((2**min_n*height)/size))).filter(ImageFilter.UnsharpMask(radius=0.8, percent=80, threshold=3)))
-                           i.crop((offset_x, offset_y, offset_x + width-1, offset_y + height-1)).resize((int((2**min_n * width)/size), int((2**min_n*height)/size))))
+                           i.crop((offset_x, offset_y, offset_x + width-1, offset_y + height-1)).resize((int((2**min_n * width)/size), int((2**min_n*height)/size))).filter(ImageFilter.UnsharpMask(radius=1.0, percent=100, threshold=3)))
+                           #i.crop((offset_x, offset_y, offset_x + width-1, offset_y + height-1)).resize((int((2**min_n * width)/size), int((2**min_n*height)/size))))
 
 
 if __name__ == "__main__":

@@ -216,4 +216,23 @@ class RegexConverter(BaseConverter):
         super(RegexConverter, self).__init__(url_map)
         self.regex = items[0]
 
+mimes = {
+			'jp2': 'image/jp2',
+			'png': 'image/png',
+			'jpg': 'image/jpg',
+		    'jpeg': 'image/jpg',
+		    'gif': 'image/gif',
+		    'tif': 'image/tiff',
+		    'tiff': 'image/tiff',
+		    'json': 'application/json',
+		    'json-ld': 'application/ld+json'
+		}
+
+
+def create_key(url, region='full', scale='max', rotation='0', quality='default', format=None):
+    format = format or get_setting('cache_format', 'jpg')
+    scale = 'max' if scale == 'full' else scale
+    quality = 'default' if quality == 'color' else quality
+
+    return ':'.join((url, region, scale, rotation, quality, format))
 

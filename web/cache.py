@@ -9,15 +9,29 @@ from flask import Flask,Response,request,send_file
 from urllib.parse import urlparse
 from contextlib import closing
 from hashlib import md5
-from os.path import exists,basename,dirname
-from os import makedirs
+from os.path import exists,basename,dirname,join
+from os import makedirs,rename,remove
 from datetime import datetime
+from filelock import SoftFileLock
 
 class Cache():
     debug = False
 
-    def __init__(self, base):
+    def __init__(self, base, ttl=None):
         self.base=base
+        self.ttl=ttl
+
+
+    def lock(self, key):
+        lockdir = join(self.base, 'locks')
+        lockfname = join(lockdir, self.hash(key) + '.lock')
+
+        self.pdebug('LOCK - ' + lockfname)
+
+        if not exists(lockdir):
+            makedirs(lockdir)
+
+        return SoftFileLock(lockfname)
 
 
     def set(self, key, data, info={}):
@@ -59,42 +73,48 @@ class Cache():
         d['key'] = key
         d['time'] = datetime.utcnow().strftime('%Y-%m-%dT%H:%m:%SZ')
 
-        # should probably lock this section using the key
-        with open(fname, mode='wb') as f:
-            if isinstance(data, str):
-                d['mode'] = 's'
-                f.write(data.encode('utf-8'))
-                yield data
-            elif isinstance(data, bytes):
-                f.write(data)
-                yield data
-            elif isinstance(data, Iterator):
-                for b in data:
-                    if isinstance(b, str):
+        
+        with self.lock(key):
+            try:
+                with open(fname + '.writing', mode='wb') as f:
+                    if isinstance(data, str):
                         d['mode'] = 's'
-                        be=b.encode('utf-8')
-                        f.write(be)
+                        f.write(data.encode('utf-8'))
+                        yield data
+                    elif isinstance(data, bytes):
+                        f.write(data)
+                        yield data
+                    elif isinstance(data, Iterator):
+                        for b in data:
+                            if isinstance(b, str):
+                                d['mode'] = 's'
+                                be=b.encode('utf-8')
+                                f.write(be)
+                            else:
+                                f.write(b)
+
+                            yield b
+                    elif isinstance(data, IOBase):
+                        b=data.read(chunk_size)
+                        while len(b) != 0:
+                            if isinstance(b, str):
+                                d['mode'] = 's'
+                                be=b.encode('utf-8')
+                                f.write(be)
+                            else:
+                                f.write(b)
+
+                            yield b
                     else:
-                        f.write(b)
+                        raise Exception('Unexpected type for data (%s)', str(type(data)))
 
-                    yield b
-            elif isinstance(data, IOBase):
-                b=data.read(chunk_size)
-                while len(b) != 0:
-                    if isinstance(b, str):
-                        d['mode'] = 's'
-                        be=b.encode('utf-8')
-                        f.write(be)
-                    else:
-                        f.write(b)
+                rename(fname + '.writing', fname)
 
-                    yield b
-            else:
-                raise Exception('Unexpected type for data (%s)', str(type(data)))
- 
-        with open(fname + '.json', mode='w') as f:
-            dump(d, f)
-
+                with open(fname + '.json', mode='w') as f:
+                    dump(d, f)
+            except:
+                remove(fname + '.writing')
+                raise
 
 
     def get(self, key):
@@ -127,8 +147,17 @@ class Cache():
                         b=f.read(chunk_size)
 
     def getfile(self, key):
-        if key in self :
+        if key in self:
             return self.filename(key)
+        else:
+            return None
+
+
+    def get_location(self, key):
+        if key in self:
+            fname = self.filename(key)
+
+            return (dirname(fname), basename(fname))
         else:
             return None
 
@@ -160,10 +189,17 @@ class Cache():
 
 
     def filename(self, key):
-        hex = md5(key.encode('utf-8')).hexdigest()
+        hex = self.hash(key)
 
         return '/'.join([ self.base ] + [ hex[ 2*i:2*i+2 ] for i in range(0,4) ] + [ hex ])
+
+    
+    def hash(self, key):
+        return md5(key.encode('utf-8')).hexdigest()
+
 
     def pdebug(self, *args):
         if self.debug:
             print('CACHE', *args, file=stderr, flush=True)
+
+
