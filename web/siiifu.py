@@ -1,56 +1,89 @@
 #!/usr/bin/env python3
 
-from flask import Flask,Response,render_template,request
+from flask import Flask,Response,render_template,request,send_file,make_response,send_from_directory
 from flask_api.exceptions import APIException
 from yaml import load
-from image import get_image,get_info,mimes
 from data import validate,resolve
-from utils import RegexConverter
+from utils import RegexConverter,mimes,create_key
 from cache import Cache
+from urllib.parse import quote
+from os.path import join
+from requests import get
 
 app = Flask(__name__)
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 app.url_map.converters['regex'] = RegexConverter
-with open('config.yml') as f:
+with open(join(app.root_path, 'config.yml')) as f:
     config = load(f)
-
+Cache.debug=True
+cache = Cache(**config['cache'])
 
 # IIIF Image 2.1
 @app.route('/<prefix>/<path:identifier>/info.json')
-def info_json(prefix, identifier):
-    prefix = config['prefixes'][prefix]
-    url = resolve(prefix, identifier)
-    
-    return Response(
-            render_template(
-                'info.json',
-                id='/'.join(request.url.split('/')[:-1]),
-                info=get_info(url)),
-            mimetype='application/ld+json')
+def info(prefix, identifier):
+    p = config['prefixes'][prefix]
+    url = resolve(p, identifier)
+
+    if url in cache:
+         return send(*cache.get_location(key), 'application/json')
 
 
-# IIIF Image 2.1
-#@app.route('/<prefix>/<path:identifier>/<region>/<size>/<rotation>/<quality>.<regex("^((?!json).*)$"):format>')
-@app.route('/<prefix>/<path:identifier>/<region>/<size>/<rotation>/<quality>.<format>')
-def image(prefix, identifier, region, size, rotation, quality, format):
-    print(prefix, identifier, region, size, rotation, quality, format)
-    prefix = config['prefixes'][prefix]
-    url = resolve(prefix, identifier)
-    validate(prefix, url, region, size, rotation, quality, format)
 
-    return Response(
-            get_image(
-                prefix,
-                url,
-                region,
-                size,
-                rotation,
-                quality,
-                format),
-            mimetype=mimes[format])
+
+@app.route('/<prefix>/<path:identifier>/<region>/<size>/<rotation>/<regex("default|color|gray|bitonal|edge"):quality>.<regex("jpg|jp2|png"):format>')
+def image(prefix, identifier, region=None, size=None, rotation=None, quality=None, format=None):
+    p = config['prefixes'][prefix]
+    url = resolve(p, identifier)
+    validate(p, url, region, size, rotation, quality, format)
+    key = create_key(url, region, size, rotation, quality, format)
+
+    if key in cache:
+        return send(*cache.get_location(key), mimes[format])
+
+    # look for cached image by normalizing parameters
+    if url in cache:
+        i = loads(cache.get(url))
+        nkey = create_key(url, region, size, rotation, quality, format, i['width'], i['height'], normalize=True)
+
+        if nkey in cache:
+            return send(*cache.get_location(key), mimes[format])
+
+    with cache.lock(url + ':global'):
+        # check cache twice to avoid locking at all in the
+        # most common case while still avoiding resource stampede
+        if key in cache:
+            return send(*cache.get_location(key), mimes[format])
+
+        params = {  'url': url,
+                    'region': region,
+                    'size': size,
+                    'rotation': rotation,
+                    'quality': quality,
+                    'format': format } if region else {}
+
+        headers = { 'Content-Type': mimes[format],
+                    'Access-Control-Allow-Origin': '*' }
+
+        # unclear if this returns lazily, which will release the lock
+        with get(config['workers']['url'] + 'image', params=params, stream=True) as r:
+            #r = get(config['workers']['url'] + 'image', params=params, stream=True)
+            return Response(r.iter_content(100*1024), headers=headers)
+
+
+def send(dir, filename, mime_type):
+    r = make_response(send_from_directory(dir, filename))
+    r.headers['Access-Control-Allow-Origin'] = '*'
+    r.headers['Content-Type'] = mime_type
+
+    return r
+
+
+@app.route('/static/<path:f>')
+def static_file(f):
+    return send('static', f)
 
 
 if __name__ == '__main__':
     app.debug=True
-    app.run(host='0.0.0.0', threaded=True)
+    app.run(host='0.0.0.0', port=5000, threaded=True)
 

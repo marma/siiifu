@@ -1,20 +1,40 @@
-tiling:
-    tile_size: 256
+settings:
+    cache_original: false
+    cache_full: true
+    tile_size: 512
+    cache_format: jpg
+    quality: 90
+    max_resize: 20000
+
+# Turn off gray, bitonal, rotation and arbitrary cropping to
+# conserve resources. These operation can, and perhaps should(?),
+# be done in the viewer app instead. Allowing (and requesting)
+# other formats than the one used for tiles means transcoding
+# will occur and the result will not be cached.
+features:
+    gray: true
+    bitonal: true
+    rotation: true
+    arbitrary_crop: true
+    formats:
+        - jpg
+        - png
+        - gif
+
+# Increase numbers of workers with docker-compose
+workers:
+    url: http://worker:5000/
 
 cache:
     base: /tmp/cache
+    ttl: forever
 
 prefixes:
     any:
         identifier_prefix: ''
         identifier_postfix: ''
-    
-        allowed_schemas:
-            - http
-            - https
 
-        supported_formats:
-            - jpg
-            - png
-            - gif
+        allowed_domains:
+            - "*"
+
 

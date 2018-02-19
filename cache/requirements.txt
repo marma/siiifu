@@ -1,5 +1,0 @@
-Flask>=0.12
-Flask-Cache>=0.13
-requests>=2.13.0
-pyyaml>=3.12
-gunicorn>=19.7.0

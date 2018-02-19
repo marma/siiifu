@@ -1,1 +1,4 @@
-__pycache__
+.DS_Store
+__pycache__/
+web/__pycache__/
+web/venv/
