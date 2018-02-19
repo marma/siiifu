@@ -229,10 +229,74 @@ mimes = {
 		}
 
 
-def create_key(url, region='full', scale='max', rotation='0', quality='default', format=None):
-    format = format or get_setting('cache_format', 'jpg')
-    scale = 'max' if scale == 'full' else scale
+def create_key(url, region='full', size='max', rotation='0', quality='default', format='jpg', width=None, height=None, normalize=False):
+    size = 'max' if size == 'full' else size
     quality = 'default' if quality == 'color' else quality
 
-    return ':'.join((url, region, scale, rotation, quality, format))
+    if normalize:
+        x,y,w,h = crop(width, height, region)
+        region = 'full' if (x,y,w,h) == (0,0,width,height) else ','.join([ str(x) for x in (x,y,w,h) ])
+        w2,h2 = scale(w,h,size)
+        size = 'max' if (w,h) == (w2,h2) else ','.join([ str(x) for x in (w2,h2) ])
+
+    return ':'.join((url, region, size, rotation, quality, format))
+
+
+def crop(width, height, region):
+    if region != 'full':
+        if region == 'square':
+            diff = abs(width-height)
+            if width > height:
+                x,y,w,h = diff/2, 0, height, height
+            else:
+                x,y,w,h = 0, diff/2, width, width
+        elif region[:4] == 'pct:':
+            z = [ width, height, width, height ]
+            s = [ int(z[x[0]]*float(x[1])) for x in enumerate(region[4:].split(',')) ]
+            x,y,w,h = s[0], s[1], min(s[2], width), min(s[3], height)
+        else:
+            s = [ int(x) for x in region.split(',') ]
+            x,y,w,h = s[0], s[1], min(s[2], width-s[0]), min(s[3], height-s[1])
+
+        return x,y,w,h
+    else:
+        return 0, 0, width, height
+
+
+def scale(width, height, scale):
+    if scale not in [ 'full', 'max' ]:
+        if scale[:4] == 'pct:':
+            s = float(scale[4:])/100
+            if s <= 1.0:
+                w,h = int(width*s), int(height*s)
+        elif scale[0] == '!':
+            s = scale[1:].split(',')
+
+            if s[0] == '':
+                s[1] = min(int(s[1]), width)
+                w,h = int(image.width * s[1] / height), s[1]
+            elif s[1] == '':
+                print(s[0], )
+                s[0] = min(int(s[0]), width)
+                w,h = s[0], int(height * s[0] / width)
+            else:
+                s = [ min(int(s[0]), width), min(int(s[1]), height) ]
+                w,h = s[0], s[1]
+        else:
+            s = scale.split(',')
+
+            if s[0] == '':
+                s[1] = int(s[1])
+                w,h = int(image.width * s[1] / image.height), s[1]
+            elif s[1] == '':
+                print(s[0], )
+                s[0] = int(s[0])
+                w,h = s[0], int(image.height * s[0] / image.width)
+            else:
+                #s = [ min(int(s[0]), image.width), min(int(s[1]), image.height) ]
+                w,h = int(s[0]), int(s[1])
+
+        return w,h
+    else:
+        return width, height
 

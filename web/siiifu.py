@@ -21,7 +21,13 @@ cache = Cache(**config['cache'])
 # IIIF Image 2.1
 @app.route('/<prefix>/<path:identifier>/info.json')
 def info(prefix, identifier):
-    pass
+    p = config['prefixes'][prefix]
+    url = resolve(p, identifier)
+
+    if url in cache:
+         return send(*cache.get_location(key), 'application/json')
+
+
 
 
 @app.route('/<prefix>/<path:identifier>/<region>/<size>/<rotation>/<regex("default|color|gray|bitonal|edge"):quality>.<regex("jpg|jp2|png"):format>')
@@ -35,6 +41,12 @@ def image(prefix, identifier, region=None, size=None, rotation=None, quality=Non
         return send(*cache.get_location(key), mimes[format])
 
     # look for cached image by normalizing parameters
+    if url in cache:
+        i = loads(cache.get(url))
+        nkey = create_key(url, region, size, rotation, quality, format, i['width'], i['height'], normalize=True)
+
+        if nkey in cache:
+            return send(*cache.get_location(key), mimes[format])
 
     with cache.lock(url + ':global'):
         # check cache twice to avoid locking at all in the
@@ -53,9 +65,9 @@ def image(prefix, identifier, region=None, size=None, rotation=None, quality=Non
                     'Access-Control-Allow-Origin': '*' }
 
         # unclear if this returns lazily, which will release the lock
-        r = get(config['workers']['url'] + 'image', params=params, stream=True)
-        
-        return Response(r.iter_content(100*1024), headers=headers)
+        with get(config['workers']['url'] + 'image', params=params, stream=True) as r:
+            #r = get(config['workers']['url'] + 'image', params=params, stream=True)
+            return Response(r.iter_content(100*1024), headers=headers)
 
 
 def send(dir, filename, mime_type):

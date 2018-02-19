@@ -4,6 +4,7 @@ settings:
     tile_size: 512
     cache_format: jpg
     quality: 90
+    max_resize: 20000
 
 # Turn off gray, bitonal, rotation and arbitrary cropping to
 # conserve resources. These operation can, and perhaps should(?),
@@ -25,7 +26,7 @@ workers:
     url: http://worker:5000/
 
 cache:
-    base: /data/cache
+    base: /tmp/cache
     ttl: forever
 
 prefixes:
