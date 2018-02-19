@@ -66,7 +66,9 @@ def image():
             # TODO: use optimal size rather than 'max'
             key = create_key(url, 'full', 'max', '0', 'default', config['settings']['cache_format'])
             if key in cache:
-                image = resize(crop(Image.open(BytesIO(cache.get(key))), region), size)
+                image = Image.open(BytesIO(cache.get(key)))
+                image = crop(image, region)
+                image = resize(image, size)
             else:
                 raise Exception('Stitching image from tiles not supported yet')
 
@@ -83,8 +85,9 @@ def image():
 def save(url):
     req = get(url, stream=True)
     req.raw.decode_stream=True
-    r = run('gm convert - -depth 8 -compress none tif:-', req.raw, ignore_err=True)
-    i = Image.open(r.stdout)
+    #r = run('convert - -depth 8 -compress none tif:-', req.raw, ignore_err=True)
+    #i = Image.open(r.stdout)
+    i = Image.open(req.raw)
 
     # write info
     info = { 'width': i.width, 'height': i.height, 'format': i.format }
@@ -105,6 +108,7 @@ def save(url):
     ingest(i, url)
 
     return info
+
 
 def save_to_cache(key, image):
     b = BytesIO()
@@ -140,7 +144,7 @@ def ingest(i, url):
                         create_key(
                             url,
                             #','.join( [ str(size*x), str(size*y), str(size*(x+1)-1), str(size*(y+1)-1) ],
-                            ','.join([ str(offset_x), str(offset_y), str(offset_x + width-1), str(offset_y + height-1) ]),
+                            ','.join([ str(offset_x), str(offset_y), str(width), str(height) ]),
                             #'!512,512',
                             ','.join([ str(int((2**min_n * width)/size)), str(int((2**min_n*height)/size)) ]),
                             '0',
@@ -163,9 +167,9 @@ def crop(image, region):
         if region == 'square':
             diff = abs(image.width-image.height)
             if image.width > image.height:
-                x,y,w,h = diff/2, 0, image.width - diff/2, image.height
+                x,y,w,h = diff/2, 0, image.height, image.height
             else:
-                x,y,w,h = 0, diff/2, image.width, image.height - diff/2
+                x,y,w,h = 0, diff/2, image.width, image.width
         elif region[:4] == 'pct:':
             z = [ image.width, image.height, image.width, image.height ]
             s = [ int(z[x[0]]*float(x[1])) for x in enumerate(region[4:].split(',')) ]
@@ -174,6 +178,8 @@ def crop(image, region):
             s = [ int(x) for x in region.split(',') ]
             x,y,w,h = s[0], s[1], min(s[2], image.width-s[0]), min(s[3], image.height-s[1])
 
+        print(x,y,w,h)
+
         image = image.crop((x,y,x+w,y+h))
    
     return image
@@ -181,12 +187,14 @@ def crop(image, region):
 
 def resize(image, scale):
     if scale not in [ 'full', 'max' ]:
+        max_resize = int(get_setting('max_resize', '20000'))
+
         if scale[:4] == 'pct:':
             s = float(scale[4:])/100
             if s <= 1.0:
                 w,h = int(image.width*s), int(image.height*s)
-        else:
-            s = scale.split(',')
+        elif scale[0] == '!':
+            s = scale[1:].split(',')
 
             if s[0] == '':
                 s[1] = min(int(s[1]), image.width)
@@ -198,8 +206,28 @@ def resize(image, scale):
             else:
                 s = [ min(int(s[0]), image.width), min(int(s[1]), image.height) ]
                 w,h = s[0], s[1]
+        else:
+            s = scale.split(',')
 
-        return image.resize((w,h), Image.LANCZOS)
+            if s[0] == '':
+                s[1] = int(s[1])
+                w,h = int(image.width * s[1] / image.height), s[1]
+            elif s[1] == '':
+                print(s[0], )
+                s[0] = int(s[0])
+                w,h = s[0], int(image.height * s[0] / image.width)
+            else:
+                #s = [ min(int(s[0]), image.width), min(int(s[1]), image.height) ]
+                w,h = int(s[0]), int(s[1])
+
+        ow = image.width
+        image = image.resize((min(w, max_resize), min(h, max_resize)), Image.LANCZOS)
+
+        # sharpen?
+        if w / ow < 0.75:
+            image = image.filter(ImageFilter.UnsharpMask(radius=0.8, percent=90, threshold=3))
+
+        return image
 
     return image
 
@@ -224,23 +252,18 @@ def do_quality(image, quality):
 
 
 def get_info(url):
-    with closing(get(url, stream=True)) as r:
-        b = next(r.iter_content(50*1024))
-        p = run('gm identify -' , b, ignore_err=True)
-        s = p.text.split()
+    try:
+        # attempt to peek information from first 10k of image
+        r = get(url, stream=True)
+        r.raw.decode = True
+        b = r.raw.read(10*1024)
+        r.close()
+        i = Image.open(b)
 
-    # get the whole file, which might take some time
-    if len(s) == 0:
+        return { 'format': i.format, 'width': i.width, 'height': i.height }
+    except:
+        # get the whole file, which might take some time
         return save(url)
-
-#        with closing(get(url, stream=True)) as r:
-#            p = run('gm identify -' , r.iter_content(100*1024), ignore_err=True)
-#            s = p.text.split()
-#
-
-    ret = { 'format': s[1], 'width': s[2].split('x')[0], 'height': s[2].split('x')[1].split('+')[0] }
-
-    return ret
 
 
 if __name__ == '__main__':

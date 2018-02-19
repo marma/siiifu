@@ -5,7 +5,7 @@ services:
         restart: always
         build: ./web
         environment:
-            - FLASK_DEBUG=0
+            - FLASK_DEBUG=1
             - FLASK_APP=/app/siiifu.py
         expose:
             - 5000
@@ -21,7 +21,7 @@ services:
         restart: always
         build: ./web
         environment:
-            - FLASK_DEBUG=0
+            - FLASK_DEBUG=1
             - FLASK_APP=/app/image.py
         expose:
             - 5000
