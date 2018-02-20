@@ -22,7 +22,7 @@ app = Flask(__name__)
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 with open(join(app.root_path, 'config.yml')) as f:
     config = load(f)
-Cache.debug=True
+#Cache.debug=True
 cache = Cache(**config['cache'])
 
 @app.route('/info')
@@ -85,13 +85,7 @@ def image():
 def save(url):
     req = get(url, stream=True)
     req.raw.decode_stream=True
-    #r = run('convert - -depth 8 -compress none tif:-', req.raw, ignore_err=True)
-    #i = Image.open(r.stdout)
     i = Image.open(req.raw)
-
-    # write info
-    info = { 'width': i.width, 'height': i.height, 'format': i.format }
-    cache.set(url, dumps(info))
 
     # save full size?
     if get_setting('cache_full', False):
@@ -106,6 +100,10 @@ def save(url):
                 i)
 
     ingest(i, url)
+
+    # write info
+    info = { 'width': i.width, 'height': i.height, 'format': i.format }
+    cache.set(url, dumps(info))
 
     return info
 
@@ -141,16 +139,19 @@ def ingest(i, url):
                     i2 = i2.filter(ImageFilter.UnsharpMask(radius=0.8, percent=90, threshold=3))
 
                 save_to_cache(
-                        create_key(
-                            url,
-                            #','.join( [ str(size*x), str(size*y), str(size*(x+1)-1), str(size*(y+1)-1) ],
-                            ','.join([ str(offset_x), str(offset_y), str(width), str(height) ]),
-                            #'!512,512',
-                            ','.join([ str(int((2**min_n * width)/size)), str(int((2**min_n*height)/size)) ]),
-                            '0',
-                            'default',
-                            get_setting('cache_format', 'jpg')),
-                        i2)
+                    create_key(
+                        url,
+                        #','.join( [ str(size*x), str(size*y), str(size*(x+1)-1), str(size*(y+1)-1) ],
+                        ','.join([ str(offset_x), str(offset_y), str(width), str(height) ]),
+                        #'!512,512',
+                        ','.join([ str(int((2**min_n * width)/size)), str(int((2**min_n*height)/size)) ]),
+                        '0',
+                        'default',
+                        get_setting('cache_format', 'jpg'),
+                        width=i.width,
+                        height=i.height,
+                        normalize=True),
+                    i2)
 
     for extra in get_setting('prerender', []):
         save_to_cache(
@@ -256,9 +257,9 @@ def get_info(url):
         # attempt to peek information from first 10k of image
         r = get(url, stream=True)
         r.raw.decode = True
-        b = r.raw.read(10*1024)
+        b = r.raw.read(25*1024)
         r.close()
-        i = Image.open(b)
+        i = Image.open(BytesIO(b))
 
         return { 'format': i.format, 'width': i.width, 'height': i.height }
     except:

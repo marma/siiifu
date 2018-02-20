@@ -14,12 +14,8 @@ RUN apt-get update && \
 
 ENV LANG=C.UTF-8
 
-COPY requirements.txt /
-RUN pip3 install --no-cache-dir -r /requirements.txt
-
-EXPOSE 5000
-
 ADD . /app
-COPY config.yml /
+RUN pip3 install --no-cache-dir -r /app/requirements.txt
+EXPOSE 5000
  
 CMD /usr/local/bin/gunicorn --pythonpath /app -b :5000 siiifu:app

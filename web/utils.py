@@ -233,11 +233,13 @@ def create_key(url, region='full', size='max', rotation='0', quality='default', 
     size = 'max' if size == 'full' else size
     quality = 'default' if quality == 'color' else quality
 
+    #print(region, size, flush=True)
     if normalize:
         x,y,w,h = crop(width, height, region)
         region = 'full' if (x,y,w,h) == (0,0,width,height) else ','.join([ str(x) for x in (x,y,w,h) ])
         w2,h2 = scale(w,h,size)
         size = 'max' if (w,h) == (w2,h2) else ','.join([ str(x) for x in (w2,h2) ])
+        #print(region, size, flush=True)
 
     return ':'.join((url, region, size, rotation, quality, format))
 

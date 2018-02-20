@@ -34,7 +34,19 @@ prefixes:
         identifier_prefix: ''
         identifier_postfix: ''
 
+        auth:
+            user: xyz
+            pass: 123
+
         allowed_domains:
             - "*"
 
+credentials:
+    - pattern: "http://example.org/*"
+      user: xyz
+      pass: 123
+
+auth:
+    user: xyz
+    pass: 123
 
