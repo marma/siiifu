@@ -5,8 +5,7 @@
     "protocol": "http://iiif.io/api/image",
     "width": {{ info['width'] }},
     "height": {{ info['height'] }},
-    "tiles": [ { "width" : 256, "height" : 256, "scaleFactors" : [ 1,2,4,8,16 ] } ],
-    "sizes": [ {"width": 715, "height": 1000}, {"width": 286, "height": 400}, {"width": 143, "height": 200}, {"width": 72, "height": 100} ],
+    "tiles": [ { "width" : 512, "scaleFactors" : [ {{ levels | join(', ') }} ]  } ],
     "profile" : [
         "http://iiif.io/api/image/2/level1.json",
         {

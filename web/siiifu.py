@@ -10,6 +10,7 @@ from cache import Cache
 from urllib.parse import quote
 from os.path import join
 from requests import get
+from  math import log2
 
 app = Flask(__name__)
 app.config['TEMPLATES_AUTO_RELOAD'] = True
@@ -24,10 +25,28 @@ cache = Cache(**config['cache'])
 def info(prefix, identifier):
     p = config['prefixes'][prefix]
     url = resolve(p, identifier)
+    i = _info(url)
+    id = config['base'] + prefix + '/' + quote(identifier)
+    levels = [ 2**x for x in range(0, int(log2(min(i['width']-1, i['height']-1)))+1) ]
 
-    if url in cache:
-        return send(*cache.get_location(key), 'application/json')
+    if not i:
+            return 'Not found', 404
     
+    return Response(render_template('info.json', id=id, info=i, levels=levels), mimetype='application/json')
+
+
+def _info(url):
+    i = cache.get(url)
+
+    if not i:
+        try:
+            i = get(config['workers']['url'] + 'info', params={ 'url': url }).text
+        except:
+            return None
+
+    print(i)
+    return loads(i)
+
 
 @app.route('/<prefix>/<path:identifier>/<region>/<size>/<rotation>/<regex("default|color|gray|bitonal|edge"):quality>.<regex("jpg|jp2|png"):format>')
 def image(prefix, identifier, region, size, rotation, quality, format):
@@ -71,6 +90,19 @@ def image(prefix, identifier, region, size, rotation, quality, format):
         # unclear if this returns lazily, which will release the lock
         r = get(config['workers']['url'] + 'image', params=params, stream=True)
         return Response(r.iter_content(100*1024), headers=headers)
+
+
+@app.route('/view/<prefix>/<path:identifier>')
+def view(prefix, identifier):
+    p = config['prefixes'][prefix]
+    url = resolve(p, identifier)
+    i = loads(info(prefix, identifier).data)
+
+    if i:
+        return render_template('view.html', url=url, config=config, prefix=p, info=i)
+    else:
+        return 'Not found', 404
+    
 
 
 def send(dir, filename, mime_type):

@@ -1,3 +1,5 @@
+base: 'http://localhost:5000/'
+
 settings:
     cache_original: false
     cache_full: true

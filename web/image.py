@@ -8,7 +8,6 @@ from PIL import Image,ImageFile,ImageFilter
 from requests import get
 from contextlib import closing
 from utils import run,iterstream,create_key
-from caching import cache
 from json import dumps,loads
 from yaml import load
 from flask_api.exceptions import NotFound
@@ -59,6 +58,7 @@ def image():
         return Response(cache.iter_get(nkey), mimetype=mimes[format])
 
     # image is cached, just not in the right rotation, quality or format?
+    print('doing actual work for url: ' + url)
     key = create_key(url, region, size, '0', 'default', config['settings']['cache_format'])
     if key in cache:
         image = Image.open(BytesIO(cache.get(key)))
