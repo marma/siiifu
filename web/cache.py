@@ -154,9 +154,9 @@ class Cache():
 
 
     def get_location(self, key):
-        if key in self:
-            fname = self.filename(key)
+        fname = self.filename(key)
 
+        if exists(fname):
             return (dirname(fname), basename(fname))
         else:
             return None

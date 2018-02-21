@@ -22,7 +22,7 @@ app = Flask(__name__)
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 with open(join(app.root_path, 'config.yml')) as f:
     config = load(f)
-#Cache.debug=True
+Cache.debug=True
 cache = Cache(**config['cache'])
 
 @app.route('/info')
@@ -44,14 +44,21 @@ def image():
     format = request.args.get('format', 'jpg')
 
     if url not in cache:
-        save(url)
+        i = save(url)
+    else:
+        i = loads(cache.get(url))
 
     # exact match?
     key = create_key(url, region, size, rotation, quality, format)
     if key in cache:
         return Response(cache.iter_get(key), mimetype=mimes[format])
 
-	# image is cached, just not in the right rotation, quality or format?
+    # match for normalized key?
+    nkey = create_key(url, region, size, rotation, quality, format, width=i['width'], height=i['height'], normalize=True)
+    if nkey in cache:
+        return Response(cache.iter_get(nkey), mimetype=mimes[format])
+
+    # image is cached, just not in the right rotation, quality or format?
     key = create_key(url, region, size, '0', 'default', config['settings']['cache_format'])
     if key in cache:
         image = Image.open(BytesIO(cache.get(key)))
@@ -156,7 +163,7 @@ def ingest(i, url):
     for extra in get_setting('prerender', []):
         save_to_cache(
             create_key(url, **extra),
-            create_image(url, **extra))
+            create_image(i, **extra))
 
 
 def get_setting(key, default):
@@ -207,6 +214,11 @@ def resize(image, scale):
             else:
                 s = [ min(int(s[0]), image.width), min(int(s[1]), image.height) ]
                 w,h = s[0], s[1]
+
+            if image.width > image.height:
+                h = int(w * image.height / image.width)
+            else:
+                w = int(h * image.width / image.height)
         else:
             s = scale.split(',')
 

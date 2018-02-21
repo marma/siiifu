@@ -11,7 +11,7 @@ def validate(prefix, url, region, scale, rotation, quality, format):
     if not match(region_re, region):
         raise Exception('%s not a valid region' % region, 400)
     
-    scale_match=match('^(full|max|{d}*,{d}*|pct:{f})$'.format(d='\\d', f='\\d+(\\.\\d+)?'), scale)
+    scale_match=match('^(full|max|{d}*,{d}*|!{d}*,{d}*|pct:{f})$'.format(d='\\d', f='\\d+(\\.\\d+)?'), scale)
     if not scale_match or scale_match.group(1) == ',':
         raise Exception('%s not a valid scale' % scale, 400)
 

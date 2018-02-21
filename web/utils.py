@@ -284,16 +284,21 @@ def scale(width, height, scale):
             else:
                 s = [ min(int(s[0]), width), min(int(s[1]), height) ]
                 w,h = s[0], s[1]
+
+            if width > height:
+                h = int(w * height / width)
+            else:
+                w = int(h * width / height)
         else:
             s = scale.split(',')
 
             if s[0] == '':
                 s[1] = int(s[1])
-                w,h = int(image.width * s[1] / image.height), s[1]
+                w,h = int(width * s[1] / height), s[1]
             elif s[1] == '':
                 print(s[0], )
                 s[0] = int(s[0])
-                w,h = s[0], int(image.height * s[0] / image.width)
+                w,h = s[0], int(height * s[0] / width)
             else:
                 #s = [ min(int(s[0]), image.width), min(int(s[1]), image.height) ]
                 w,h = int(s[0]), int(s[1])

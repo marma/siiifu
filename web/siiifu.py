@@ -3,6 +3,7 @@
 from flask import Flask,Response,render_template,request,send_file,make_response,send_from_directory
 from flask_api.exceptions import APIException
 from yaml import load
+from json import loads
 from data import validate,resolve
 from utils import RegexConverter,mimes,create_key
 from cache import Cache
@@ -15,7 +16,7 @@ app.config['TEMPLATES_AUTO_RELOAD'] = True
 app.url_map.converters['regex'] = RegexConverter
 with open(join(app.root_path, 'config.yml')) as f:
     config = load(f)
-#Cache.debug=True
+Cache.debug=True
 cache = Cache(**config['cache'])
 
 # IIIF Image 2.1
@@ -34,17 +35,27 @@ def image(prefix, identifier, region, size, rotation, quality, format):
     url = resolve(p, identifier)
     validate(p, url, region, size, rotation, quality, format)
     key = create_key(url, region, size, rotation, quality, format)
+    params = {  'url': url,
+                'region': region,
+                'size': size,
+                'rotation': rotation,
+                'quality': quality,
+                'format': format }
+
+    headers = { 'Content-Type': mimes[format],
+                'Access-Control-Allow-Origin': '*' }
 
     if key in cache:
         return send(*cache.get_location(key), mimes[format])
 
     # look for cached image by normalizing parameters
-    if url in cache:
-        i = loads(cache.get(url))
+    i = cache.get(url)
+    if i:
+        i = loads(i)
         nkey = create_key(url, region, size, rotation, quality, format, i['width'], i['height'], normalize=True)
 
-        if nkey != key and key in cache:
-            return send(*cache.get_location(key), mimes[format])
+        if nkey != key and nkey in cache:
+            return send(*cache.get_location(nkey), mimes[format])
 
         # since the image is cached, get the image from a worker without locking
         r = get(config['workers']['url'] + 'image', params=params, stream=True)
@@ -56,16 +67,6 @@ def image(prefix, identifier, region, size, rotation, quality, format):
         # most common case while still avoiding resource stampede
         if key in cache:
             return send(*cache.get_location(key), mimes[format])
-
-        params = {  'url': url,
-                    'region': region,
-                    'size': size,
-                    'rotation': rotation,
-                    'quality': quality,
-                    'format': format }
-
-        headers = { 'Content-Type': mimes[format],
-                    'Access-Control-Allow-Origin': '*' }
 
         # unclear if this returns lazily, which will release the lock
         r = get(config['workers']['url'] + 'image', params=params, stream=True)
