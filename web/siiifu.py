@@ -17,7 +17,7 @@ app.config['TEMPLATES_AUTO_RELOAD'] = True
 app.url_map.converters['regex'] = RegexConverter
 with open(join(app.root_path, 'config.yml')) as f:
     config = load(f)
-#Cache.debug=True
+Cache.debug=True
 cache = Cache(**config['cache'])
 
 # IIIF Image 2.1

@@ -41,6 +41,7 @@ def image():
     rotation = request.args.get('rotation', '0')
     quality = request.args.get('quality', 'default')
     format = request.args.get('format', 'jpg')
+    tile_size = get_setting('tile_size', 512)
 
     if url not in cache:
         i = save(url)
@@ -53,7 +54,7 @@ def image():
         return Response(cache.iter_get(key), mimetype=mimes[format])
 
     # match for normalized key?
-    nkey = create_key(url, region, size, rotation, quality, format, width=i['width'], height=i['height'], normalize=True)
+    nkey = create_key(url, region, size, rotation, quality, format, width=i['width'], height=i['height'], tile_size=tile_size, normalize=True)
     if nkey in cache:
         return Response(cache.iter_get(nkey), mimetype=mimes[format])
 
