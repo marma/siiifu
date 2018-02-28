@@ -26,8 +26,10 @@ def info(prefix, identifier):
     p = config['prefixes'][prefix]
     url = resolve(p, identifier)
     i = _info(url)
+
     id = config['base'] + prefix + '/' + quote(identifier)
-    levels = [ 2**x for x in range(0, int(log2(min(i['width']-1, i['height']-1)))+1) ]
+    tile_size = int(config.get('settings', {}).get('tile_size', 512))
+    levels = [ 2**x for x in range(0, int(log2(min(i['width']-1, i['height']-1)) + 1 - int(log2(tile_size)))) ]
 
     if not i:
             return 'Not found', 404
@@ -44,7 +46,6 @@ def _info(url):
         except:
             return None
 
-    print(i)
     return loads(i)
 
 

@@ -148,7 +148,7 @@ class iterstream():
 
 
     def seek(self, i):
-        print('Seeking to %d' % i, file=stderr)
+        #print('Seeking to %d' % i, file=stderr)
         if i < self.p:
             raise Exception('Cannot seek: %d < %d' % (i, self.p))
 
@@ -278,7 +278,7 @@ def scale(width, height, scale):
                 s[1] = min(int(s[1]), width)
                 w,h = int(image.width * s[1] / height), s[1]
             elif s[1] == '':
-                print(s[0], )
+                #print(s[0], )
                 s[0] = min(int(s[0]), width)
                 w,h = s[0], int(height * s[0] / width)
             else:
@@ -296,7 +296,7 @@ def scale(width, height, scale):
                 s[1] = int(s[1])
                 w,h = int(width * s[1] / height), s[1]
             elif s[1] == '':
-                print(s[0], )
+                #print(s[0], )
                 s[0] = int(s[0])
                 w,h = s[0], int(height * s[0] / width)
             else:

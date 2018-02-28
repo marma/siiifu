@@ -58,7 +58,7 @@ def image():
         return Response(cache.iter_get(nkey), mimetype=mimes[format])
 
     # image is cached, just not in the right rotation, quality or format?
-    print('doing actual work for url: ' + url)
+    print('doing actual work for url: ' + url, flush=True)
     key = create_key(url, region, size, '0', 'default', config['settings']['cache_format'])
     if key in cache:
         image = Image.open(BytesIO(cache.get(key)))
@@ -186,7 +186,7 @@ def crop(image, region):
             s = [ int(x) for x in region.split(',') ]
             x,y,w,h = s[0], s[1], min(s[2], image.width-s[0]), min(s[3], image.height-s[1])
 
-        print(x,y,w,h)
+        #print(x,y,w,h)
 
         image = image.crop((x,y,x+w,y+h))
    
@@ -208,7 +208,7 @@ def resize(image, scale):
                 s[1] = min(int(s[1]), image.width)
                 w,h = int(image.width * s[1] / image.height), s[1]
             elif s[1] == '':
-                print(s[0], )
+                #print(s[0], )
                 s[0] = min(int(s[0]), image.width)
                 w,h = s[0], int(image.height * s[0] / image.width)
             else:
@@ -226,7 +226,7 @@ def resize(image, scale):
                 s[1] = int(s[1])
                 w,h = int(image.width * s[1] / image.height), s[1]
             elif s[1] == '':
-                print(s[0], )
+                #print(s[0], )
                 s[0] = int(s[0])
                 w,h = s[0], int(image.height * s[0] / image.width)
             else:
@@ -269,7 +269,7 @@ def get_info(url):
         # attempt to peek information from first 10k of image
         r = get(url, stream=True)
         r.raw.decode = True
-        b = r.raw.read(25*1024)
+        b = r.raw.read(50*1024)
         r.close()
         i = Image.open(BytesIO(b))
 
