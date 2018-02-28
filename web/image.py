@@ -193,7 +193,7 @@ def crop(image, region):
     return image
 
 
-def resize(image, scale):
+def resize(image, scale, tile_size=None):
     if scale not in [ 'full', 'max' ]:
         max_resize = int(get_setting('max_resize', '20000'))
 
@@ -226,9 +226,13 @@ def resize(image, scale):
                 s[1] = int(s[1])
                 w,h = int(image.width * s[1] / image.height), s[1]
             elif s[1] == '':
-                #print(s[0], )
                 s[0] = int(s[0])
                 w,h = s[0], int(image.height * s[0] / image.width)
+
+                # correct for rounding errors?
+                h1 = int(image.height * (s[0]-1) / image.width)
+                if tile_size and h > tile_size and h1 <= tile_size:
+                    h = tile_size
             else:
                 #s = [ min(int(s[0]), image.width), min(int(s[1]), image.height) ]
                 w,h = int(s[0]), int(s[1])
