@@ -229,7 +229,7 @@ mimes = {
 		}
 
 
-def create_key(url, region='full', size='max', rotation='0', quality='default', format='jpg', width=None, height=None, normalize=False):
+def create_key(url, region='full', size='max', rotation='0', quality='default', format='jpg', width=None, height=None, tile_size=None, normalize=False):
     size = 'max' if size == 'full' else size
     quality = 'default' if quality == 'color' else quality
 
@@ -237,7 +237,7 @@ def create_key(url, region='full', size='max', rotation='0', quality='default', 
     if normalize:
         x,y,w,h = crop(width, height, region)
         region = 'full' if (x,y,w,h) == (0,0,width,height) else ','.join([ str(x) for x in (x,y,w,h) ])
-        w2,h2 = scale(w,h,size)
+        w2,h2 = scale(w, h, size, tile_size)
         size = 'max' if (w,h) == (w2,h2) else ','.join([ str(x) for x in (w2,h2) ])
         #print(region, size, flush=True)
 
@@ -258,6 +258,7 @@ def crop(width, height, region):
             x,y,w,h = s[0], s[1], min(s[2], width), min(s[3], height)
         else:
             s = [ int(x) for x in region.split(',') ]
+            #print(s, flush=True)
             x,y,w,h = s[0], s[1], min(s[2], width-s[0]), min(s[3], height-s[1])
 
         return x,y,w,h
@@ -265,7 +266,7 @@ def crop(width, height, region):
         return 0, 0, width, height
 
 
-def scale(width, height, scale):
+def scale(width, height, scale, tile_size=None):
     if scale not in [ 'full', 'max' ]:
         if scale[:4] == 'pct:':
             s = float(scale[4:])/100
@@ -276,7 +277,7 @@ def scale(width, height, scale):
 
             if s[0] == '':
                 s[1] = min(int(s[1]), width)
-                w,h = int(image.width * s[1] / height), s[1]
+                w,h = int(width * s[1] / height), s[1]
             elif s[1] == '':
                 #print(s[0], )
                 s[0] = min(int(s[0]), width)
@@ -299,8 +300,12 @@ def scale(width, height, scale):
                 #print(s[0], )
                 s[0] = int(s[0])
                 w,h = s[0], int(height * s[0] / width)
+
+                # correct for rounding errors?
+                h1 = int(height * (s[0]-1) / width)
+                if tile_size and h > tile_size and h1 <= tile_size:
+                    h = tile_size
             else:
-                #s = [ min(int(s[0]), image.width), min(int(s[1]), image.height) ]
                 w,h = int(s[0]), int(s[1])
 
         return w,h

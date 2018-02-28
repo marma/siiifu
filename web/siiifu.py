@@ -10,14 +10,14 @@ from cache import Cache
 from urllib.parse import quote
 from os.path import join
 from requests import get
-from  math import log2
+from math import log2
 
 app = Flask(__name__)
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 app.url_map.converters['regex'] = RegexConverter
 with open(join(app.root_path, 'config.yml')) as f:
     config = load(f)
-Cache.debug=True
+#Cache.debug=True
 cache = Cache(**config['cache'])
 
 # IIIF Image 2.1
@@ -70,9 +70,10 @@ def image(prefix, identifier, region, size, rotation, quality, format):
 
     # look for cached image by normalizing parameters
     i = cache.get(url)
+    tile_size = int(config.get('settings', {}).get('tile_size', 512))
     if i:
         i = loads(i)
-        nkey = create_key(url, region, size, rotation, quality, format, i['width'], i['height'], normalize=True)
+        nkey = create_key(url, region, size, rotation, quality, format, i['width'], i['height'], tile_size=tile_size, normalize=True)
 
         if nkey != key and nkey in cache:
             return send(*cache.get_location(nkey), mimes[format])
