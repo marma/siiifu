@@ -26,7 +26,7 @@ class Cache():
         lockdir = join(self.base, 'locks')
         lockfname = join(lockdir, self.hash(key) + '.lock')
 
-        self.pdebug('LOCK - ' + lockfname)
+        self.pdebug('LOCK - ' + key + '(' + lockfname + ')')
 
         if not exists(lockdir):
             makedirs(lockdir)

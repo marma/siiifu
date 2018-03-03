@@ -140,7 +140,7 @@ def ingest(i, url):
                 width = min(size, i.width - offset_x)
                 height = min(size, i.height - offset_y)
 
-                i2 = i.crop((offset_x, offset_y, offset_x + width-1, offset_y + height-1)) \
+                i2 = i.crop((offset_x, offset_y, offset_x + width, offset_y + height)) \
                       .resize((int((2**min_n * width)/size), int((2**min_n*height)/size)), Image.LANCZOS)
 
                 if n != min_n:

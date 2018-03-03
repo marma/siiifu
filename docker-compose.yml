@@ -15,7 +15,7 @@ services:
             - ./web:/app
             - cache-volume:/data/cache
         #command: flask run --host 0.0.0.0
-        command: /usr/local/bin/gunicorn -k gevent --pythonpath /app --workers 2 --timeout 300 -b :5000 siiifu:app
+        command: /usr/local/bin/gunicorn -k gevent --reload --pythonpath /app --workers 2 --timeout 300 -b :5000 siiifu:app
 
 
     worker:
@@ -26,13 +26,13 @@ services:
             - FLASK_APP=/app/image.py
         expose:
             - 5000
-        ports:
-            - 5001:5000
+        #ports:
+        #    - 5001:5000
         volumes:
             - ./web:/app
             - cache-volume:/data/cache
         #command: flask run --host 0.0.0.0
-        command: /usr/local/bin/gunicorn -k gevent --pythonpath /app --workers 2 --timeout 300 -b :5000 image:app
+        command: /usr/local/bin/gunicorn -k gevent --reload --pythonpath /app --workers 2 --timeout 300 -b :5000 image:app
 
 
     nginx:

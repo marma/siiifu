@@ -27,7 +27,8 @@ def info(prefix, identifier):
     url = resolve(p, identifier)
     i = _info(url)
 
-    id = config['base'] + prefix + '/' + quote(identifier)
+    id = request.url_root + prefix + '/' + quote(identifier)
+    print(id, flush=True)
     tile_size = int(config.get('settings', {}).get('tile_size', 512))
     levels = [ 2**x for x in range(0, int(log2(min(i['width']-1, i['height']-1)) + 1 - int(log2(tile_size)))) ]
 
@@ -62,8 +63,7 @@ def image(prefix, identifier, region, size, rotation, quality, format):
                 'quality': quality,
                 'format': format }
 
-    headers = { 'Content-Type': mimes[format],
-                'Access-Control-Allow-Origin': '*' }
+    headers = { 'Content-Type': mimes[format] }
 
     if key in cache:
         return send(*cache.get_location(key), mimes[format])
