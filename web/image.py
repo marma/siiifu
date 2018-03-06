@@ -89,7 +89,8 @@ def image():
 
     # this can get expensive!
     if get_setting('cache_all', False):
-        save_to_cache(key, image)
+        print('warning: caching arbitrary sized image (%s)' % nkey, flush=True)
+        save_to_cache(nkey, image)
 
     return Response(b.getvalue(), mimetype=mimes[format])
 
@@ -121,6 +122,7 @@ def save(url):
 
 
 def save_to_cache(key, image):
+    print('save_to_cache', key, image, flush=True)
     b = BytesIO()
     icc_profile = image.info.get("icc_profile")
     format = config.get('settings', {}).get('cache_format', 'jpg')
@@ -137,8 +139,8 @@ def ingest(i, url):
     for n in reversed(range(min_n, max_n+1)):
         size = 2 ** n
 
-        for x in range(0, int(i.width/size) + 1):
-            for y in range(0, int(i.height/size) + 1):
+        for x in range(0, int((i.width-1)/size) + 1):
+            for y in range(0, int((i.height-1)/size) + 1):
                 offset_x = size * x
                 offset_y = size * y
                 width = min(size, i.width - offset_x)
