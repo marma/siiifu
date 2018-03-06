@@ -5,6 +5,7 @@ settings:
     cache_format: jpg
     quality: 90
     max_resize: 20000
+    cache_all: true
 
 # Turn off gray, bitonal, rotation and arbitrary cropping to
 # conserve resources. These operation can, and perhaps should(?),

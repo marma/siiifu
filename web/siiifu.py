@@ -34,7 +34,11 @@ def info(prefix, identifier):
 
     if not i:
             return 'Not found', 404
-    
+
+    r = Response(render_template('info.json', id=id, info=i, levels=levels))
+    r.headers['Content-Type'] = 'application/json'
+    r.headers['Access-Control-Allow-Origin'] = '*'
+
     return Response(render_template('info.json', id=id, info=i, levels=levels), mimetype='application/json')
 
 

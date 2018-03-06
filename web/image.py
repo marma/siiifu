@@ -87,6 +87,10 @@ def image():
     icc_profile = image.info.get("icc_profile")
     image.save(b, quality=90, icc_profile=icc_profile, progressive=True, format='jpeg' if format == 'jpg' else format)
 
+    # this can get expensive!
+    if get_setting('cache_all', False):
+        save_to_cache(key, image)
+
     return Response(b.getvalue(), mimetype=mimes[format])
 
 
