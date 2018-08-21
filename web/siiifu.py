@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 
-from flask import Flask,Response,render_template,request,send_file,make_response,send_from_directory
+from flask import Flask,Response,render_template,request,send_file,make_response,send_from_directory,url_for
 from flask_api.exceptions import APIException
+from werkzeug.contrib.fixers import ProxyFix
 from yaml import load
 from json import loads
 from data import validate,resolve
@@ -13,6 +14,7 @@ from requests import get
 from math import log2
 
 app = Flask(__name__)
+app.wsgi_app = ProxyFix(app.wsgi_app)
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 app.url_map.converters['regex'] = RegexConverter
 with open(join(app.root_path, 'config.yml')) as f:
@@ -27,13 +29,16 @@ def info(prefix, identifier):
     url = resolve(p, identifier)
     i = _info(url)
 
+    print(request.headers)
+
+    #id = url_for('/' + prefix + '/' + quote(identifier))
     id = request.url_root + prefix + '/' + quote(identifier)
     print(id, flush=True)
     tile_size = int(config.get('settings', {}).get('tile_size', 512))
     levels = [ 2**x for x in range(0, int(log2(min(i['width']-1, i['height']-1)) + 1 - int(log2(tile_size)))) ]
 
     if not i:
-            return 'Not found', 404
+        return 'Not found', 404
 
     r = Response(render_template('info.json', id=id, info=i, levels=levels))
     r.headers['Content-Type'] = 'application/json'
