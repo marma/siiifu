@@ -1,4 +1,4 @@
-FROM ubuntu:17.10
+FROM ubuntu:18.04
 
 RUN apt-get update && \
     apt-get install -y gcc && \
@@ -10,7 +10,8 @@ RUN apt-get update && \
     apt-get install -y libpng-dev && \
     apt-get install -y libopenjp2-7 && \
     apt-get install -y libopenjp2-7-dev && \
-    apt-get install -y libopenjp2-tools
+    apt-get install -y libopenjp2-tools && \
+    apt-get install -y poppler-utils
 
 ENV LANG=C.UTF-8
 

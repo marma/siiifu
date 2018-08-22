@@ -4,7 +4,7 @@ A Dockerized IIIF server relying heavily on a central cache for caching both res
 
 Worst case scenario, nothing can be retrieved from cache: 1,2,3,4,5,6,7,9,11
 Better scenario, resource cached: 1,2,3,6,7,9,10
-Best case scenario, exact result cached: 1,2,8,9,10,11
+Best case scenario, exact result cached: 1,2,8,9,11
 
     ----------      ---------                ----------       -------------       ------------
     |        |--1-->|       |------2-------->|        |---3-->|           |---4-->|          |

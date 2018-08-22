@@ -16,6 +16,9 @@ from io import BytesIO
 from utils import mimes
 from cache import Cache
 from math import log2
+from htfile import open as htopen
+from PyPDF2 import PdfFileReader, PdfFileWriter
+from pdf2image import convert_from_path, convert_from_bytes
 
 app = Flask(__name__)
 app.config['TEMPLATES_AUTO_RELOAD'] = True
@@ -97,11 +100,7 @@ def image():
 
 
 def save(url):
-    print('saving url %s' % url, flush=True)
-
-    req = get(url, stream=True)
-    req.raw.decode_stream=True
-    i = Image.open(req.raw)
+    i = get_image(url)
 
     # save full size?
     if get_setting('cache_full', False):
@@ -124,7 +123,29 @@ def save(url):
     return info
 
 
+def get_image(url):
+    m = match(r'(^.*\.pdf):(\d+)$', url)
+
+    # PDF?
+    if m:
+        r = htopen(m.group(1), mode='rb', debug=True)
+        pr = PdfFileReader(r)
+        p = pr.getPage(int(m.group(2)))
+        pw = PdfFileWriter()
+        pw.addPage(p)
+        b = BytesIO()
+        pw.write(b)
+        b.seek(0)
+        i = convert_from_bytes(b.read())[0]
+    else:
+        req = get(url, stream=True)
+        req.raw.decode_stream=True
+        i = Image.open(req.raw)
+
+    return i
+
 def save_to_cache(key, image):
+    print('save_to_cache', key, image, flush=True)
     b = BytesIO()
     icc_profile = image.info.get("icc_profile")
     format = config.get('settings', {}).get('cache_format', 'jpg')
