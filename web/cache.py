@@ -29,7 +29,10 @@ class Cache():
         self.pdebug('LOCK - ' + key + '(' + lockfname + ')')
 
         if not exists(lockdir):
-            makedirs(lockdir)
+            try:
+                makedirs(lockdir)
+            except:
+                pass
 
         return SoftFileLock(lockfname)
 

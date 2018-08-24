@@ -30,15 +30,25 @@ cache = Cache(**config['cache'])
 @app.route('/info')
 def info():
     url = request.args['url']
+    uri = request.args.get('uri', None) or url
 
-    return Response(
-            cache.get(url) if url in cache else dumps(get_info(url), indent=2),
-            mimetype='application/json')
+    if uri in cache:
+        i = cache.get(uri)
+    else:
+        with cache.lock(uri + ':global'):
+            # check again after recieving lock
+            if uri in cache:
+                i = cache.get(uri)
+            else:
+                i = dumps(get_info(url, uri), indent=2)
+
+    return Response(i, mimetype='application/json')
 
 
 @app.route('/image')
 def image():
     url = request.args['url']
+    uri = request.args.get('uri', url)
     region = request.args.get('region', 'full')
     size = request.args.get('size', 'max')
     rotation = request.args.get('rotation', '0')
@@ -46,36 +56,55 @@ def image():
     format = request.args.get('format', 'jpg')
     tile_size = get_setting('tile_size', 512)
 
-    if url not in cache:
-        i = save(url)
-    else:
-        i = loads(cache.get(url))
+    # optimistic first attempt at avoiding lookup by fixing size with trailing comma
+    if match(r'^\d+,$', size) and match(r'^\d+,\d+,\d+,\d+$', region):
+        x,y,w,h = [ int(x) for x in match(r'(\d+),(\d+),(\d+),(\d+)', region).groups() ]
+        s = int(match(r'(\d+),', size).group(1))
+        size = size + str(int(s*h/w))
+
+    # optimistic attempt at avoiding lookup by fixing max size
+    if match(r'^\d+,\d+,\d+,\d+$', region) and match(r'^\d+,\d+$', size):
+        x,y,w,h = [ int(x) for x in match(r'(\d+),(\d+),(\d+),(\d+)', region).groups() ]
+        sx,sy = [ int(x) for x in match(r'(\d+),(\d+)', size).groups() ]
+
+        if (w,h) == (sx,sy):
+            size = 'max'
 
     # exact match?
-    key = create_key(url, region, size, rotation, quality, format)
+    key = create_key(uri, region, size, rotation, quality, format)
     if key in cache:
         return Response(cache.iter_get(key), mimetype=mimes[format])
 
+    if uri in cache:
+        i = loads(cache.get(uri))
+    else:
+        with cache.lock(uri + ':global'):
+            # check again after recieving lock
+            if uri in cache:
+                i = loads(cache.get(uri))
+            else:
+                i = save(url, uri=uri)
+
     # match for normalized key?
-    nkey = create_key(url, region, size, rotation, quality, format, width=i['width'], height=i['height'], tile_size=tile_size, normalize=True)
+    nkey = create_key(uri, region, size, rotation, quality, format, width=i['width'], height=i['height'], tile_size=tile_size, normalize=True)
     if nkey in cache:
         return Response(cache.iter_get(nkey), mimetype=mimes[format])
 
     # image is cached, just not in the right rotation, quality or format?
     print('doing actual work for url: ' + url, flush=True)
-    key = create_key(url, region, size, '0', 'default', config['settings']['cache_format'])
+    key = create_key(uri, region, size, '0', 'default', config['settings']['cache_format'])
     if key in cache:
         image = Image.open(BytesIO(cache.get(key)))
     else:
         # image is cached, but size is wrong
         # TODO: use optimal size rather than 'max'
-        key = create_key(url, region, 'max', '0', 'default', config['settings']['cache_format'])
+        key = create_key(uri, region, 'max', '0', 'default', config['settings']['cache_format'])
         if key in cache:
             image = resize(Image.open(BytesIO(cache.get(key))), size)
         else:
             # requested image is also cropped
             # TODO: use optimal size rather than 'max'
-            key = create_key(url, 'full', 'max', '0', 'default', config['settings']['cache_format'])
+            key = create_key(uri, 'full', 'max', '0', 'default', config['settings']['cache_format'])
             if key in cache:
                 image = Image.open(BytesIO(cache.get(key)))
                 image = crop(image, region)
@@ -98,14 +127,15 @@ def image():
     return Response(b.getvalue(), mimetype=mimes[format])
 
 
-def save(url):
+def save(url, uri=None):
+    uri = uri or url
     i = get_image(url)
 
     # save full size?
     if get_setting('cache_full', False):
         save_to_cache(
                 create_key(
-                    url,
+                    uri,
                     'full',
                     'max',
                     '0',
@@ -113,11 +143,11 @@ def save(url):
                     get_setting('cache_format', 'jpg')),
                 i)
 
-    ingest(i, url)
+    ingest(i, url, uri)
 
     # write info
     info = { 'width': i.width, 'height': i.height, 'format': i.format }
-    cache.set(url, dumps(info))
+    cache.set(uri, dumps(info))
 
     return info
 
@@ -139,7 +169,8 @@ def get_image(url):
     else:
         req = get(url, stream=True)
         req.raw.decode_stream=True
-        i = Image.open(req.raw)
+        b = req.raw.read()
+        i = Image.open(BytesIO(b))
 
     return i
 
@@ -153,10 +184,11 @@ def save_to_cache(key, image):
     cache.set(key, b.getvalue())
 
 
-def ingest(i, url):
+def ingest(i, url, uri=None):
     tile_size = get_setting('tile_size', '512')
     min_n = int(log2(tile_size))
     max_n=int(min(log2(i.width), log2(i.height)))
+    uri = uri or url
 
     for n in reversed(range(min_n, max_n+1)):
         size = 2 ** n
@@ -176,7 +208,7 @@ def ingest(i, url):
 
                 save_to_cache(
                     create_key(
-                        url,
+                        uri,
                         #','.join( [ str(size*x), str(size*y), str(size*(x+1)-1), str(size*(y+1)-1) ],
                         ','.join([ str(offset_x), str(offset_y), str(width), str(height) ]),
                         #'!512,512',
@@ -191,7 +223,7 @@ def ingest(i, url):
 
     for extra in get_setting('prerender', []):
         save_to_cache(
-            create_key(url, **extra),
+            create_key(uri, **extra),
             create_image(i, **extra))
 
 
@@ -297,19 +329,18 @@ def do_quality(image, quality):
     return image
 
 
-def get_info(url):
+def get_info(url, uri=None):
     try:
-        # attempt to peek information from first 10k of image
-        r = get(url, stream=True)
-        r.raw.decode = True
-        b = r.raw.read(50*1024)
-        r.close()
-        i = Image.open(BytesIO(b))
+        # attempt to peek information from first 50k of image
+        with closing(get(url, stream=True)) as r:
+            r.raw.decode = True
+            b = r.raw.read(50*1024)
+            i = Image.open(BytesIO(b))
 
-        return { 'format': i.format, 'width': i.width, 'height': i.height }
+            return { 'format': i.format, 'width': i.width, 'height': i.height }
     except:
         # get the whole file, which might take some time
-        return save(url)
+        return save(url, uri=uri)
 
 
 if __name__ == '__main__':

@@ -98,7 +98,7 @@ def image(prefix, identifier, region, size, rotation, quality, format):
         if key in cache:
             return send(*cache.get_location(key), mimes[format])
 
-        # unclear if this returns lazily, which will release the lock
+        # unclear if this returns lazily, which would release the lock
         r = get(config['workers']['url'] + 'image', params=params, stream=True)
         return Response(r.iter_content(100*1024), headers=headers)
 
