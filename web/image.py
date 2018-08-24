@@ -24,8 +24,9 @@ app = Flask(__name__)
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 with open(join(app.root_path, 'config.yml')) as f:
     config = load(f)
-Cache.debug=True
+Cache.debug=False
 cache = Cache(**config['cache'])
+Image.MAX_IMAGE_PIXELS = 30000*30000
 
 @app.route('/info')
 def info():

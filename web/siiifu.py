@@ -19,7 +19,7 @@ app.config['TEMPLATES_AUTO_RELOAD'] = True
 app.url_map.converters['regex'] = RegexConverter
 with open(join(app.root_path, 'config.yml')) as f:
     config = load(f)
-Cache.debug=True
+Cache.debug=False
 cache = Cache(**config['cache'])
 
 # IIIF Image 2.1
@@ -44,7 +44,7 @@ def info(prefix, identifier):
     r.headers['Content-Type'] = 'application/json'
     r.headers['Access-Control-Allow-Origin'] = '*'
 
-    return Response(render_template('info.json', id=id, info=i, levels=levels), mimetype='application/json')
+    return r
 
 
 def _info(url):
