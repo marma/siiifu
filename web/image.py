@@ -92,7 +92,7 @@ def image():
         return Response(cache.iter_get(nkey), mimetype=mimes[format])
 
     # image is cached, just not in the right rotation, quality or format?
-    print('doing actual work for url: ' + url, flush=True)
+    print('doing actual work for url: ' + uri, flush=True)
     key = create_key(uri, region, size, '0', 'default', config['settings']['cache_format'])
     if key in cache:
         image = Image.open(BytesIO(cache.get(key)))
@@ -202,7 +202,7 @@ def ingest(i, url, uri=None):
                 height = min(size, i.height - offset_y)
 
                 i2 = i.crop((offset_x, offset_y, offset_x + width, offset_y + height)) \
-                      .resize((int((2**min_n * width)/size), int((2**min_n*height)/size)), Image.LANCZOS)
+                      .resize((round((2**min_n * width)/size), round((2**min_n*height)/size)), Image.LANCZOS)
 
                 if n != min_n:
                     i2 = i2.filter(ImageFilter.UnsharpMask(radius=0.8, percent=90, threshold=3))
@@ -213,7 +213,7 @@ def ingest(i, url, uri=None):
                         #','.join( [ str(size*x), str(size*y), str(size*(x+1)-1), str(size*(y+1)-1) ],
                         ','.join([ str(offset_x), str(offset_y), str(width), str(height) ]),
                         #'!512,512',
-                        ','.join([ str(int((2**min_n * width)/size)), str(int((2**min_n*height)/size)) ]),
+                        ','.join([ str(round((2**min_n * width)/size)), str(round((2**min_n*height)/size)) ]),
                         '0',
                         'default',
                         get_setting('cache_format', 'jpg'),
