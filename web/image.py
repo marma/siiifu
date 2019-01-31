@@ -36,7 +36,7 @@ def info():
     if uri in cache:
         i = cache.get(uri)
     else:
-        with cache.lock(uri + ':global'):
+        with cache.lock(uri + ':worker'):
             # check again after recieving lock
             if uri in cache:
                 i = cache.get(uri)
@@ -79,7 +79,7 @@ def image():
     if uri in cache:
         i = loads(cache.get(uri))
     else:
-        with cache.lock(uri + ':global'):
+        with cache.lock(uri + ':worker'):
             # check again after recieving lock
             if uri in cache:
                 i = loads(cache.get(uri))
