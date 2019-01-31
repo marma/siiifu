@@ -7,7 +7,7 @@ Better scenario, resource cached: 1,2,3,6,7,9,10
 Best case scenario, exact result cached: 1,2,8,9,11
 
     ----------      ---------                ----------       -------------       ------------
-    |        |--1-->|       |------2-------->|        |---3-->|           |---4-->|          |
+    |        |---1->|       |-------2------->|        |---3-->|           |---4-->|          |
     | client |      | NGINX |<-----10--------| Siiifu |       | Worker(s) |       | Resource |
     |        |<-12--|       |<-x-sendfile-9--|        |<--7---|           |<--5---|          |
     ----------      ---------                ----------       -------------       ------------
@@ -20,3 +20,9 @@ Best case scenario, exact result cached: 1,2,8,9,11
                        ----------11----------| Cache |<------6------|
                                              |       |
                                              ---------
+
+# Running
+
+    docker-compose up -d
+    docker-compose up -d docker-compose.yml docker-compose.network.yml
+

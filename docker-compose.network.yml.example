@@ -1,0 +1,5 @@
+networks:
+#    default:
+#        name: name_of_network
+#        external: true
+
