@@ -43,11 +43,11 @@ prefixes:
             - "*"
 
 credentials:
-#    - pattern: "http://example.org/*"
-#      user: xyz
-#      pass: 123
+    - pattern: "http://^.*$"
+      user: demo
+      pass: demo
 
-#auth:
-#    user: xyz
-#    pass: 123
+auth:
+    user: xyz
+    pass: 123
 
