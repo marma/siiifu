@@ -153,11 +153,20 @@ def save(url, uri=None):
     return info
 
 
+def hget(url, stream=False, auth=None):
+    for c in config.get('credentials', {}).values():
+        if match(c['pattern'], url):
+            return get(url, stream=stream, auth=(c['user'], c['pass']))
+
+    return get(url, stream=stream)
+
+
 def get_image(url):
     m = match(r'(^.*\.pdf):(\d+)$', url)
 
     # PDF?
     if m:
+        # TODO: use credentials in config
         r = htopen(m.group(1), mode='rb', debug=True)
         pr = PdfFileReader(r)
         p = pr.getPage(int(m.group(2)))
@@ -168,7 +177,7 @@ def get_image(url):
         b.seek(0)
         i = convert_from_bytes(b.read())[0]
     else:
-        req = get(url, stream=True)
+        req = hget(url, stream=True)
         req.raw.decode_stream=True
         b = req.raw.read()
         i = Image.open(BytesIO(b))
@@ -333,7 +342,7 @@ def do_quality(image, quality):
 def get_info(url, uri=None):
     try:
         # attempt to peek information from first 50k of image
-        with closing(get(url, stream=True)) as r:
+        with closing(hget(url, stream=True)) as r:
             r.raw.decode = True
             b = r.raw.read(50*1024)
             i = Image.open(BytesIO(b))

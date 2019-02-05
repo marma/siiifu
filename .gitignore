@@ -2,3 +2,4 @@
 __pycache__/
 web/__pycache__/
 web/venv/
+docker-compose.network.yml

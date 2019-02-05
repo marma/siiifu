@@ -41,8 +41,14 @@ prefixes:
 
         allowed_domains:
             - "*"
-
+        
+        
 credentials:
+    arkiv.kb.se:
+        pattern: "^http://.*$"
+        user: demo
+        pass: t89ughurguyqw476t8ayguhjtr
+
 #    - pattern: "http://example.org/*"
 #      user: xyz
 #      pass: 123
