@@ -153,12 +153,16 @@ def save(url, uri=None):
     return info
 
 
-def hget(url, stream=False, auth=None):
-    for c in config.get('credentials', {}).values():
+def get_credentials(url):
+    for c in config.get('credentials', {}):
         if match(c['pattern'], url):
-            return get(url, stream=stream, auth=(c['user'], c['pass']))
+            return (c['user'], c['pass'])
+    
+    return None
 
-    return get(url, stream=stream)
+
+def hget(url, stream=False, auth=None):
+    return get(url, stream=stream, auth=get_credentials(url))
 
 
 def get_image(url):
@@ -167,7 +171,7 @@ def get_image(url):
     # PDF?
     if m:
         # TODO: use credentials in config
-        r = htopen(m.group(1), mode='rb', debug=True)
+        r = htopen(m.group(1), mode='rb', debug=True, auth=get_credentials(url))
         pr = PdfFileReader(r)
         p = pr.getPage(int(m.group(2)))
         pw = PdfFileWriter()
@@ -183,6 +187,7 @@ def get_image(url):
         i = Image.open(BytesIO(b))
 
     return i
+
 
 def save_to_cache(key, image):
     print('save_to_cache', key, image, flush=True)
