@@ -34,6 +34,8 @@ class Cache():
             except:
                 pass
 
+        print(f'locking {key}', flush=True)
+
         return SoftFileLock(lockfname)
 
 

@@ -12,7 +12,7 @@ from json import dumps,loads
 from yaml import load
 from flask_api.exceptions import NotFound
 from threading import RLock
-from io import BytesIO
+from io import BytesIO,UnsupportedOperation
 from utils import mimes
 from cache import Cache
 from math import log2
@@ -170,10 +170,20 @@ def get_image(url):
 
     # PDF?
     if m:
-        # TODO: use credentials in config
-        r = htopen(m.group(1), mode='rb', debug=True, auth=get_credentials(url))
-        pr = PdfFileReader(r)
-        p = pr.getPage(int(m.group(2)))
+        try:
+            # TODO: use credentials in config
+            r = htopen(m.group(1), mode='rb', auth=get_credentials(url))
+            pr = PdfFileReader(r)
+            p = pr.getPage(int(m.group(2)))
+        except UnsupportedOperation:
+            # download whole file
+            r  = htopen(m.group(1), mode='rb', auth=get_credentials(url))
+            b = BytesIO(r.read())
+            pr = PdfFileReader(b)
+            p = pr.getPage(int(m.group(2)))
+        except:
+            raise
+
         pw = PdfFileWriter()
         pw.addPage(p)
         b = BytesIO()
