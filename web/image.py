@@ -174,24 +174,23 @@ def get_image(url):
             # TODO: use credentials in config
             r = htopen(m.group(1), mode='rb', auth=get_credentials(url))
             pr = PdfFileReader(r)
-        except UnsupportedOperation:
+
+            if pr.isEncrypted:
+                pr.decrypt('')
+
+            p = pr.getPage(int(m.group(2)))
+            pw = PdfFileWriter()
+            pw.addPage(p)
+            b = BytesIO()
+            pw.write(b)
+            b.seek(0)
+            i = convert_from_bytes(b.read())[0]
+        except (UnsupportedOperation,NotImplementedError) as e:
             # download whole file
             r  = htopen(m.group(1), mode='rb', auth=get_credentials(url))
-            b = BytesIO(r.read())
-            pr = PdfFileReader(b)
+            i = convert_from_bytes(r.read(), 300, first_page=int(m.group(2)), last_page=int(m.group(2)), userpw='')[0]
         except:
             raise
-
-        if pr.isEncrypted:
-            pr.decrypt('')
-
-        p = pr.getPage(int(m.group(2)))
-        pw = PdfFileWriter()
-        pw.addPage(p)
-        b = BytesIO()
-        pw.write(b)
-        b.seek(0)
-        i = convert_from_bytes(b.read())[0]
     else:
         req = hget(url, stream=True)
         req.raw.decode_stream=True
