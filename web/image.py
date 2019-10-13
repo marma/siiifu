@@ -32,7 +32,7 @@ Image.MAX_IMAGE_PIXELS = 30000*30000
 @app.route('/info')
 def info():
     url = request.args['url']
-    uri = request.args.get('uri', None) or url
+    uri = request.args.get('uri', url)
 
     if uri in cache:
         i = cache.get(uri)
@@ -94,16 +94,14 @@ def image():
         return Response(cache.iter_get(nkey), mimetype=mimes[format])
 
     # quick hack for JPEG2000 when originals are cached
-    #print(get_setting('opj_decompress'), flush=True)
-    #print(get_setting('cache_original'), flush=True)
     if get_setting('opj_decompress') and get_setting('cache_original'):
-        #print('opj_decompress image()')
-
         okey = uri + ':original'
 
         if okey not in cache:
-            # calling get image will cache it
-            get_image(url, uri)
+            with cache.lock(uri + ':worker'):
+                if okey not in cache:
+                    # calling get image will cache it
+                    get_image(url, uri)
         
         loc = join(*cache.get_location(okey))
 
@@ -124,7 +122,7 @@ def image():
         return Response(b.getvalue(), mimetype=mimes[format])
 
     # image is cached, just not in the right rotation, quality or format?
-    print('doing actual work for url: ' + uri, flush=True)
+    print('doing actual work for uri: ' + uri, flush=True)
     key = create_key(uri, region, size, '0', 'default', config['settings']['cache_format'])
     if key in cache:
         image = Image.open(BytesIO(cache.get(key)))
@@ -162,11 +160,11 @@ def image():
 
 def save(url, uri=None):
     uri = uri or url
+
     i = get_image(url, uri)
 
     # quick hack to avoid tiling of JPEG2000 images when cached
     if get_setting('cache_original', False) and get_setting('opj_decompress', None) and i.format == 'JPEG2000':
-        #print('opj_decompress save()')
         # do nothing for now
         ...
     else:
@@ -182,12 +180,10 @@ def save(url, uri=None):
                         get_setting('cache_format', 'jpg')),
                     i)
 
-        #print('ingest', flush=True)
         ingest(i, url, uri)
 
     # write info
     info = { 'width': i.width, 'height': i.height, 'format': i.format }
-    #print(uri, dumps(info), flush=True)
     cache.set(uri, dumps(info))
 
     return info
@@ -321,8 +317,6 @@ def crop(image, region):
             s = [ int(x) for x in region.split(',') ]
             x,y,w,h = s[0], s[1], min(s[2], image.width-s[0]), min(s[3], image.height-s[1])
 
-        #print(x,y,w,h)
-
         image = image.crop((x,y,x+w,y+h))
    
     return image
@@ -343,7 +337,6 @@ def resize(image, scale, tile_size=None):
                 s[1] = min(int(s[1]), image.width)
                 w,h = int(image.width * s[1] / image.height), s[1]
             elif s[1] == '':
-                #print(s[0], )
                 s[0] = min(int(s[0]), image.width)
                 w,h = s[0], int(image.height * s[0] / image.width)
             else:
@@ -404,7 +397,6 @@ def do_quality(image, quality):
 
 
 def get_info(url, uri=None):
-    print('get_info', flush=True)
     try:
         # attempt to peek information from first 50k of image
         with closing(hget(url, stream=True)) as r:
@@ -460,7 +452,6 @@ def resize_coords(info, scale, tile_size=None):
                 s[1] = min(int(s[1]), width)
                 w,h = int(width * s[1] / height), s[1]
             elif s[1] == '':
-                #print(s[0], )
                 s[0] = min(int(s[0]), width)
                 w,h = s[0], int(height * s[0] / width)
             else:
@@ -506,7 +497,7 @@ def opj_decompress(info, loc, region, size, tile_size=None):
     # ignore non-proportional scaling for now
     reduce_factor = int(log2(w/sw))
 
-    print(x,y,w,h,sw,sy,reduce_factor, flush=True)
+    #print(x,y,w,h,sw,sy,reduce_factor, flush=True)
 
     # run opj_decompress
     with NamedTemporaryFile(suffix='.tif') as t:
@@ -519,7 +510,6 @@ def opj_decompress(info, loc, region, size, tile_size=None):
         t.seek(0)
 
         b = t.read()
-        #print(len(b), flush=True)
 
         b = BytesIO(b)
 
