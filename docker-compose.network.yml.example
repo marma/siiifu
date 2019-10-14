@@ -1,5 +1,7 @@
+version: "3.5"
+
 networks:
-#    default:
-#        name: name_of_network
-#        external: true
+    default:
+        name: name_of_network
+        external: true
 

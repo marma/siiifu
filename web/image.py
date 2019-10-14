@@ -9,23 +9,24 @@ from requests import get
 from contextlib import closing
 from utils import run,iterstream,create_key
 from json import dumps,loads
-from yaml import load
+from yaml import load,FullLoader
 from flask_api.exceptions import NotFound
 from threading import RLock
 from io import BytesIO,UnsupportedOperation
-from utils import mimes
+from utils import mimes,run
 from cache import Cache
 from math import log2
 from htfile import open as htopen
 from PyPDF2 import PdfFileReader, PdfFileWriter
 from pdf2image import convert_from_path, convert_from_bytes
+from tempfile import NamedTemporaryFile
 
 Image.MAX_IMAGE_PIXELS = 10000000000
 
 app = Flask(__name__)
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 with open(join(app.root_path, 'config.yml')) as f:
-    config = load(f)
+    config = load(f, Loader=FullLoader)
 Cache.debug=False
 cache = Cache(**config['cache'])
 Image.MAX_IMAGE_PIXELS = 30000*30000
@@ -33,7 +34,7 @@ Image.MAX_IMAGE_PIXELS = 30000*30000
 @app.route('/info')
 def info():
     url = request.args['url']
-    uri = request.args.get('uri', None) or url
+    uri = request.args.get('uri', url)
 
     if uri in cache:
         i = cache.get(uri)
@@ -44,6 +45,7 @@ def info():
                 i = cache.get(uri)
             else:
                 i = dumps(get_info(url, uri), indent=2)
+                cache.set(uri, i)
 
     return Response(i, mimetype='application/json')
 
@@ -93,13 +95,41 @@ def image():
     if nkey in cache:
         return Response(cache.iter_get(nkey), mimetype=mimes[format])
 
+    # quick hack for JPEG2000 when originals are cached
+    if get_setting('opj_decompress') and get_setting('cache_original'):
+        okey = uri + ':original'
+
+        if okey not in cache:
+            with cache.lock(uri + ':worker'):
+                if okey not in cache:
+                    # calling get image will cache it
+                    get_image(url, uri)
+        
+        loc = join(*cache.get_location(okey))
+
+        image = opj_decompress(i, loc, region, size, tile_size=tile_size)
+
+        image = rotate(image, float(rotation))
+        image = do_quality(image, quality)
+
+        b = BytesIO()
+        icc_profile = image.info.get("icc_profile")
+        image.save(b, quality=90, icc_profile=icc_profile, progressive=True, format='jpeg' if format == 'jpg' else format)
+
+        # this can get expensive!
+        if get_setting('cache_all', False):
+            print('warning: caching arbitrary sized image (%s)' % nkey, flush=True)
+            save_to_cache(nkey, image)
+
+        return Response(b.getvalue(), mimetype=mimes[format])
+
     # image is cached, just not in the right rotation, quality or format?
-    print('doing actual work for url: ' + uri, flush=True)
+    print('doing actual work for uri: ' + uri, flush=True)
     key = create_key(uri, region, size, '0', 'default', config['settings']['cache_format'])
     if key in cache:
         image = Image.open(BytesIO(cache.get(key)))
     else:
-        # image is cached, but size is wrong
+        # image is cached, but size is wrong?
         # TODO: use optimal size rather than 'max'
         key = create_key(uri, region, 'max', '0', 'default', config['settings']['cache_format'])
         if key in cache:
@@ -132,21 +162,27 @@ def image():
 
 def save(url, uri=None):
     uri = uri or url
-    i = get_image(url)
 
-    # save full size?
-    if get_setting('cache_full', False):
-        save_to_cache(
-                create_key(
-                    uri,
-                    'full',
-                    'max',
-                    '0',
-                    'default',
-                    get_setting('cache_format', 'jpg')),
-                i)
+    i = get_image(url, uri)
 
-    ingest(i, url, uri)
+    # quick hack to avoid tiling of JPEG2000 images when cached
+    if get_setting('cache_original', False) and get_setting('opj_decompress', None) and i.format == 'JPEG2000':
+        # do nothing for now
+        ...
+    else:
+        # save full size?
+        if get_setting('cache_full', False) and not get_setting('save_original', False):
+            save_to_cache(
+                    create_key(
+                        uri,
+                        'full',
+                        'max',
+                        '0',
+                        'default',
+                        get_setting('cache_format', 'jpg')),
+                    i)
+
+        ingest(i, url, uri)
 
     # write info
     info = { 'width': i.width, 'height': i.height, 'format': i.format }
@@ -167,7 +203,8 @@ def hget(url, stream=False, auth=None):
     return get(url, stream=stream, auth=get_credentials(url))
 
 
-def get_image(url):
+def get_image(url, uri=None):
+    uri = uri or url
     m = match(r'(^.*\.pdf):(\d+)$', url)
 
     # PDF?
@@ -197,8 +234,15 @@ def get_image(url):
         print(url, flush=True)
         req = hget(url, stream=True)
         req.raw.decode_stream=True
-        b = req.raw.read()
-        i = Image.open(BytesIO(b))
+
+        if get_setting('cache_original', False):
+            print(f'caching original ({uri})', flush=True)
+            key = uri + ':original'
+            cache.set(key, req.raw)
+            i = Image.open(join(*cache.get_location(key)))
+        else:
+            b = req.raw.read()
+            i = Image.open(BytesIO(b))
 
     return i
 
@@ -256,7 +300,7 @@ def ingest(i, url, uri=None):
             create_image(i, **extra))
 
 
-def get_setting(key, default):
+def get_setting(key, default=None):
     return config.get('settings', {}).get(key, default)
 
 
@@ -275,8 +319,6 @@ def crop(image, region):
         else:
             s = [ int(x) for x in region.split(',') ]
             x,y,w,h = s[0], s[1], min(s[2], image.width-s[0]), min(s[3], image.height-s[1])
-
-        #print(x,y,w,h)
 
         image = image.crop((x,y,x+w,y+h))
    
@@ -298,7 +340,6 @@ def resize(image, scale, tile_size=None):
                 s[1] = min(int(s[1]), image.width)
                 w,h = int(image.width * s[1] / image.height), s[1]
             elif s[1] == '':
-                #print(s[0], )
                 s[0] = min(int(s[0]), image.width)
                 w,h = s[0], int(image.height * s[0] / image.width)
             else:
@@ -371,6 +412,120 @@ def get_info(url, uri=None):
         # get the whole file, which might take some time
         return save(url, uri=uri)
 
+
+def crop_coords(info, region):
+    width = info['width']
+    height = info['height']
+
+    if region != 'full':
+        if region == 'square':
+            diff = abs(width - height)
+            if width > height:
+                x,y,w,h = diff/2, 0, height, height
+            else:
+                x,y,w,h = 0, diff/2, width, width
+        elif region[:4] == 'pct:':
+            z = [ width, height, width, height ]
+            s = [ int(z[x[0]]*float(x[1])) for x in enumerate(region[4:].split(',')) ]
+            x,y,w,h = s[0], s[1], min(s[2], width), min(s[3], height)
+        else:
+            s = [ int(x) for x in region.split(',') ]
+            x,y,w,h = s[0], s[1], min(s[2], width-s[0]), min(s[3], height-s[1])
+
+        return (x,y,w,h)
+    else:
+        return (0,0,width, height)
+
+
+def resize_coords(info, scale, tile_size=None):
+    width = info['width']
+    height = info['height']
+
+    if scale not in [ 'full', 'max' ]:
+        max_resize = int(get_setting('max_resize', '20000'))
+
+        if scale[:4] == 'pct:':
+            s = float(scale[4:])/100
+            if s <= 1.0:
+                w,h = int(width*s), int(height*s)
+        elif scale[0] == '!':
+            s = scale[1:].split(',')
+
+            if s[0] == '':
+                s[1] = min(int(s[1]), width)
+                w,h = int(width * s[1] / height), s[1]
+            elif s[1] == '':
+                s[0] = min(int(s[0]), width)
+                w,h = s[0], int(height * s[0] / width)
+            else:
+                s = [ min(int(s[0]), width), min(int(s[1]), height) ]
+                w,h = s[0], s[1]
+
+            if width > height:
+                h = int(w * height / width)
+            else:
+                w = int(h * width / height)
+        else:
+            s = scale.split(',')
+
+            if s[0] == '':
+                s[1] = int(s[1])
+                w,h = int(width * s[1] / height), s[1]
+            elif s[1] == '':
+                s[0] = int(s[0])
+                w,h = s[0], int(height * s[0] / width)
+
+                # correct for rounding errors?
+                h1 = int(height * (s[0]-1) / width)
+                if tile_size and h > tile_size and h1 <= tile_size:
+                    h = tile_size
+            else:
+                #s = [ min(int(s[0]), image.width), min(int(s[1]), image.height) ]
+                w,h = int(s[0]), int(s[1])
+
+        return (w,h)
+
+    return (width, height)
+
+
+def opj_decompress(info, loc, region, size, tile_size=None):
+    opj_command = get_setting('opj_decompress')
+
+    # crop
+    x,y,w,h = crop_coords(info, region)
+
+    # resize
+    sw,sy = resize_coords({ 'width': w, 'height': h }, size, tile_size)
+
+    # ignore non-proportional scaling for now
+    reduce_factor = int(log2(w/sw))
+
+    #print(x,y,w,h,sw,sy,reduce_factor, flush=True)
+
+    # run opj_decompress
+    with NamedTemporaryFile(suffix='.tif') as t:
+        cmd = f'{opj_command} -r {reduce_factor} -d {x},{y},{x+w},{y+h} -i {loc} -OutFor TIF -o {t.name}'
+        #print(cmd, flush=True)
+
+        msg = run(f'{opj_command} -r {reduce_factor} -d {x},{y},{x+w},{y+h} -i {loc} -OutFor TIF -o {t.name}').err
+        #print(msg, flush=True)
+
+        t.seek(0)
+
+        b = t.read()
+
+        b = BytesIO(b)
+
+        im = Image.open(b)
+
+    ow = im.width
+    im = im.resize((sw,sy))
+
+    # sharpen?
+    if sw / ow < 0.75:
+        im = im.filter(ImageFilter.UnsharpMask(radius=0.8, percent=90, threshold=3))
+
+    return im
 
 if __name__ == '__main__':
     app.debug=True
