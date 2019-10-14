@@ -20,6 +20,8 @@ from htfile import open as htopen
 from PyPDF2 import PdfFileReader, PdfFileWriter
 from pdf2image import convert_from_path, convert_from_bytes
 
+Image.MAX_IMAGE_PIXELS = 10000000000
+
 app = Flask(__name__)
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 with open(join(app.root_path, 'config.yml')) as f:
@@ -192,6 +194,7 @@ def get_image(url):
         except:
             raise
     else:
+        print(url, flush=True)
         req = hget(url, stream=True)
         req.raw.decode_stream=True
         b = req.raw.read()
