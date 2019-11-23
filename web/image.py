@@ -58,6 +58,7 @@ def image():
     quality = request.args.get('quality', 'default')
     format = request.args.get('format', 'jpg')
     tile_size = get_setting('tile_size', 512)
+    oversample = request.args.get('oversample', 'false').lower() == 'true'
 
     # optimistic first attempt at avoiding lookup by fixing size with trailing comma
     if match(r'^\d+,$', size) and match(r'^\d+,\d+,\d+,\d+$', region):
@@ -105,7 +106,7 @@ def image():
         
         loc = join(*cache.get_location(okey))
 
-        image = opj_decompress(i, loc, region, size, tile_size=tile_size)
+        image = opj_decompress(i, loc, region, size, tile_size=tile_size, oversample=oversample)
 
         image = rotate(image, float(rotation))
         image = do_quality(image, quality)
@@ -485,7 +486,7 @@ def resize_coords(info, scale, tile_size=None):
     return (width, height)
 
 
-def opj_decompress(info, loc, region, size, tile_size=None):
+def opj_decompress(info, loc, region, size, tile_size=None, oversample=False):
     opj_command = get_setting('opj_decompress')
 
     # crop
@@ -497,12 +498,14 @@ def opj_decompress(info, loc, region, size, tile_size=None):
     # ignore non-proportional scaling for now
     reduce_factor = int(log2(w/sw))
 
-    #print(x,y,w,h,sw,sy,reduce_factor, flush=True)
+    # Use larger image to get better quality?
+    if oversample:
+        reduce_factor = max(0, reduce_factor-1)
 
     # run opj_decompress
     with NamedTemporaryFile(suffix='.tif') as t:
         cmd = f'{opj_command} -r {reduce_factor} -d {x},{y},{x+w},{y+h} -i {loc} -OutFor TIF -o {t.name}'
-        #print(cmd, flush=True)
+        print(cmd, flush=True)
 
         msg = run(f'{opj_command} -r {reduce_factor} -d {x},{y},{x+w},{y+h} -i {loc} -OutFor TIF -o {t.name}').err
         #print(msg, flush=True)
@@ -516,7 +519,9 @@ def opj_decompress(info, loc, region, size, tile_size=None):
         im = Image.open(b)
 
     ow = im.width
-    im = im.resize((sw,sy))
+    im = im.resize((sw,sy), resample=Image.LANCZOS)
+
+    print(ow, flush=True)
 
     # sharpen?
     if sw / ow < 0.75:
