@@ -49,7 +49,7 @@ def info():
 
 
 @app.route('/image')
-def image():
+def get_image():
     url = request.args['url']
     uri = request.args.get('uri', url)
     region = request.args.get('region', 'full')
@@ -57,8 +57,17 @@ def image():
     rotation = request.args.get('rotation', '0')
     quality = request.args.get('quality', 'default')
     format = request.args.get('format', 'jpg')
-    tile_size = get_setting('tile_size', 512)
     oversample = request.args.get('oversample', 'false').lower() == 'true'
+
+    i = image_iterator(url, uri, region, size, rotation, quality, format, oversample)
+
+    #print(i, request.args, flush=True)
+
+    return Response(i, mimetype=mimes[format])
+
+
+def image_iterator(url, uri, region, size, rotation, quality, format, oversample):
+    tile_size = get_setting('tile_size', 512)
 
     # optimistic first attempt at avoiding lookup by fixing size with trailing comma
     if match(r'^\d+,$', size) and match(r'^\d+,\d+,\d+,\d+$', region):
@@ -77,7 +86,7 @@ def image():
     # exact match?
     key = create_key(uri, region, size, rotation, quality, format)
     if key in cache:
-        return Response(cache.iter_get(key), mimetype=mimes[format])
+        yield from cache.iter_get(key)
 
     if uri in cache:
         i = loads(cache.get(uri))
@@ -92,7 +101,8 @@ def image():
     # match for normalized key?
     nkey = create_key(uri, region, size, rotation, quality, format, width=i['width'], height=i['height'], tile_size=tile_size, normalize=True)
     if nkey in cache:
-        return Response(cache.iter_get(nkey), mimetype=mimes[format])
+        yield from cache.iter_get(nkey)
+        return
 
     # quick hack for JPEG2000 when originals are cached
     if get_setting('opj_decompress') and get_setting('cache_original'):
@@ -120,7 +130,9 @@ def image():
             print('warning: caching arbitrary sized image (%s)' % nkey, flush=True)
             save_to_cache(nkey, image)
 
-        return Response(b.getvalue(), mimetype=mimes[format])
+        yield b.getvalue()
+
+        return
 
     # image is cached, just not in the right rotation, quality or format?
     print('doing actual work for uri: ' + uri, flush=True)
@@ -156,7 +168,7 @@ def image():
         print('warning: caching arbitrary sized image (%s)' % nkey, flush=True)
         save_to_cache(nkey, image)
 
-    return Response(b.getvalue(), mimetype=mimes[format])
+    yield b.getvalue()
 
 
 def save(url, uri=None):
