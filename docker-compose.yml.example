@@ -21,8 +21,8 @@ services:
         volumes:
             - ./web:/app
             - cache-volume:/data/cache
-        command: /usr/local/bin/gunicorn -k gevent --reload --pythonpath /app --workers 10 --worker-connections 1000 --timeout 300 -b :5001 image:app
-        network_mode: host
+        command: /usr/local/bin/gunicorn -k gevent --reload --pythonpath /app --workers 1 --worker-connections 10 --timeout 300 -b :5000 image:app
+
 
     siiifu-front:
         restart: always
