@@ -2,7 +2,7 @@
 
 from flask import Flask,Response,render_template,request,send_file,make_response,send_from_directory
 from os.path import join
-from re import match
+from re import match,sub
 from urllib import parse
 from PIL import Image,ImageFile,ImageFilter
 from requests import get
@@ -53,6 +53,10 @@ def info():
 @app.route('/image')
 def get_image():
     url = request.args['url']
+
+    if url.startswith('file:'):
+        raise Exception('file-URLs not allowed')
+
     uri = request.args.get('uri', url)
     region = request.args.get('region', 'full')
     size = request.args.get('size', 'max')
@@ -60,6 +64,10 @@ def get_image():
     quality = request.args.get('quality', 'default')
     format = request.args.get('format', 'jpg')
     oversample = request.args.get('oversample', 'false').lower() == 'true'
+
+    url = resolve(url)
+
+    print(uri, url, flush=True)
 
     i = image_iterator(url, uri, region, size, rotation, quality, format, oversample)
 
@@ -89,6 +97,7 @@ def image_iterator(url, uri, region, size, rotation, quality, format, oversample
     key = create_key(uri, region, size, rotation, quality, format)
     if key in cache:
         yield from cache.iter_get(key)
+        return
 
     if uri in cache:
         i = loads(cache.get(uri))
@@ -98,15 +107,38 @@ def image_iterator(url, uri, region, size, rotation, quality, format, oversample
             if uri in cache:
                 i = loads(cache.get(uri))
             else:
-                i = save(url, uri=uri)
+                i = get_info(url)
 
     # match for normalized key?
     nkey = create_key(uri, region, size, rotation, quality, format, width=i['width'], height=i['height'], tile_size=tile_size, normalize=True)
     if nkey in cache:
         yield from cache.iter_get(nkey)
+
         return
 
-    # quick hack for JPEG2000 when originals are cached
+    # quick hack for JPEG2000 files that resolve to disk
+    if get_setting('opj_decompress') and url.startswith('file:///') and i['format'] == 'JPEG2000':
+        image = opj_decompress(i, url[7:], region, size, tile_size=tile_size, oversample=oversample)
+
+        image = rotate(image, float(rotation))
+        image = do_quality(image, quality)
+
+        b = BytesIO()
+        icc_profile = image.info.get("icc_profile")
+        image.save(b, quality=90, icc_profile=icc_profile, progressive=True, format='jpeg' if format == 'jpg' else format)
+
+        # this can get expensive!
+        if get_setting('cache_all', False) or is_tile(i, image):
+            if not is_tile(i, image):
+                print('warning: caching arbitrary sized image (%s)' % nkey, flush=True)
+
+            save_to_cache(nkey, image)
+
+        yield b.getvalue()
+
+        return
+
+    # quick hack for JPEG2000 when cached originals allowed
     if get_setting('opj_decompress') and get_setting('cache_original'):
         okey = uri + ':original'
 
@@ -128,7 +160,7 @@ def image_iterator(url, uri, region, size, rotation, quality, format, oversample
         image.save(b, quality=90, icc_profile=icc_profile, progressive=True, format='jpeg' if format == 'jpg' else format)
 
         # this can get expensive!
-        if get_setting('cache_all', False):
+        if get_setting('cache_all', False) or is_tile(i, image):
             print('warning: caching arbitrary sized image (%s)' % nkey, flush=True)
             save_to_cache(nkey, image)
 
@@ -173,6 +205,11 @@ def image_iterator(url, uri, region, size, rotation, quality, format, oversample
     yield b.getvalue()
 
 
+def is_tile(i, image):
+    # TODO less naive implementation
+    return image.width == int(get_setting('tile_size')) or image.height == int(get_setting('tile_size'))
+
+
 def save(url, uri=None):
     uri = uri or url
 
@@ -210,6 +247,20 @@ def get_credentials(url):
             return (c['user'], c['pass'])
     
     return None
+
+
+def resolve(url):
+    for key,pattern in config.get('resolution', {}).items():
+        #print(key, url, pattern['match'], pattern['target'], flush=True)
+
+        if match(pattern['match'], url):
+            ret = sub(pattern['match'], pattern['target'], url)
+
+            #print(f'resolution for {key} found: {url} -> {ret}', flush=True)
+
+            return ret
+
+    return url
 
 
 def hget(url, stream=False, auth=None):
@@ -413,6 +464,11 @@ def do_quality(image, quality):
 
 
 def get_info(url, uri=None):
+    # if this is a file URL simply load the image
+    if url.startswith('file:'):
+        i = Image.open(url[7:])
+        return { 'format': i.format, 'width': i.width, 'height': i.height }
+
     try:
         # attempt to peek information from first 50k of image
         with closing(hget(url, stream=True)) as r:
@@ -538,11 +594,11 @@ def opj_decompress(info, loc, region, size, tile_size=None, oversample=False):
 
     print(ow, flush=True)
 
-    # sharpen?
-    if sw / ow < 0.75:
-        im = im.filter(ImageFilter.UnsharpMask(radius=0.8, percent=90, threshold=3))
+    # sharpen
+    im = im.filter(ImageFilter.UnsharpMask(radius=0.8, percent=90, threshold=3))
 
     return im
+
 
 if __name__ == '__main__':
     app.debug=True
