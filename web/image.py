@@ -35,6 +35,7 @@ Image.MAX_IMAGE_PIXELS = 30000*30000
 def info():
     url = request.args['url']
     uri = request.args.get('uri', url)
+    url = resolve(url)
 
     if uri in cache:
         i = cache.get(uri)
@@ -46,6 +47,8 @@ def info():
             else:
                 i = dumps(get_info(url, uri), indent=2)
                 cache.set(uri, i)
+
+    print(uri, url, i, flush=True)
 
     return Response(i, mimetype='application/json')
 
@@ -128,10 +131,10 @@ def image_iterator(url, uri, region, size, rotation, quality, format, oversample
         image.save(b, quality=90, icc_profile=icc_profile, progressive=True, format='jpeg' if format == 'jpg' else format)
 
         # this can get expensive!
-        if get_setting('cache_all', False) or is_tile(i, image):
-            if not is_tile(i, image):
-                print('warning: caching arbitrary sized image (%s)' % nkey, flush=True)
-
+        if get_setting('cache_all', False):
+            print('warning: caching arbitrary sized image (%s)' % nkey, flush=True)
+            save_to_cache(nkey, image)
+        elif is_tile(i, image):
             save_to_cache(nkey, image)
 
         yield b.getvalue()
@@ -264,7 +267,12 @@ def resolve(url):
 
 
 def hget(url, stream=False, auth=None):
-    return get(url, stream=stream, auth=get_credentials(url))
+    r = get(url, stream=stream, auth=auth or get_credentials(url))
+
+    if r.status_code != 200:
+        raise Exception(f'Expected 200 from URL ({url}), got {r.status_code}')
+    
+    return r
 
 
 def get_image(url, uri=None):
