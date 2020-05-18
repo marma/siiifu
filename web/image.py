@@ -57,8 +57,8 @@ def info():
 def get_image():
     url = request.args['url']
 
-    if url.startswith('file:'):
-        raise Exception('file-URLs not allowed')
+    if url.startswith('file:') or '..' in url:
+        raise Exception('relative or file-URLs not allowed')
 
     uri = request.args.get('uri', url)
     region = request.args.get('region', 'full')
@@ -95,6 +95,18 @@ def image_iterator(url, uri, region, size, rotation, quality, format, oversample
 
         if (w,h) == (sx,sy):
             size = 'max'
+
+    # short-circuit full-size files that resolve to disk
+    if url and url.startswith('file:///') and size == 'max' and region == 'full' and rotation == '0' and quality == 'default' and url.endswith(format):
+        with open(url[7:], mode='rb') as f:
+            b=f.read(100*1024)
+            while len(b) != 0:
+                yield b
+                b=f.read(100*1024)
+
+        return
+
+    
 
     # exact match?
     key = create_key(uri, region, size, rotation, quality, format)
