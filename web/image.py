@@ -106,14 +106,13 @@ def image_iterator(url, uri, region, size, rotation, quality, format, oversample
 
         return
 
-    
-
     # exact match?
     key = create_key(uri, region, size, rotation, quality, format)
     if key in cache:
         yield from cache.iter_get(key)
         return
 
+    # get info and cache / tile file if necessary
     if uri in cache:
         i = loads(cache.get(uri))
     else:
@@ -122,7 +121,12 @@ def image_iterator(url, uri, region, size, rotation, quality, format, oversample
             if uri in cache:
                 i = loads(cache.get(uri))
             else:
-                i = get_info(url)
+                i = get_info(url, uri)
+                
+                # tile everything except JPEG2000
+                if i['format'] != 'JPEG2000':
+                    im = get_image(url, uri)
+                    ingest(im, url, uri)
 
     # match for normalized key?
     nkey = create_key(uri, region, size, rotation, quality, format, width=i['width'], height=i['height'], tile_size=tile_size, normalize=True)
@@ -184,11 +188,15 @@ def image_iterator(url, uri, region, size, rotation, quality, format, oversample
         return
 
     # image is cached, just not in the right rotation, quality or format?
-    print('doing actual work for uri: ' + uri, flush=True)
     key = create_key(uri, region, size, '0', 'default', config['settings']['cache_format'])
     if key in cache:
         image = Image.open(BytesIO(cache.get(key)))
+    elif url.startswith('file:///'):
+        image = get_image(url, uri)
+        image = crop(image, region)
+        image = resize(image, size)
     else:
+        print('doing actual work for uri: ' + uri, flush=True)
         # image is cached, but size is wrong?
         # TODO: use optimal size rather than 'max'
         key = create_key(uri, region, 'max', '0', 'default', config['settings']['cache_format'])
@@ -198,6 +206,7 @@ def image_iterator(url, uri, region, size, rotation, quality, format, oversample
             # requested image is also cropped
             # TODO: use optimal size rather than 'max'
             key = create_key(uri, 'full', 'max', '0', 'default', config['settings']['cache_format'])
+
             if key in cache:
                 image = Image.open(BytesIO(cache.get(key)))
                 image = crop(image, region)
@@ -225,8 +234,16 @@ def is_tile(i, image):
     return image.width == int(get_setting('tile_size')) or image.height == int(get_setting('tile_size'))
 
 
-def save(url, uri=None):
+def save(url, uri=None, info=None):
     uri = uri or url
+
+    key = create_key(uri, 'full', 'max', '0', 'default', get_setting('cache_format', 'jpg'))
+
+    info = info or get_info(url, uri, download=False)
+
+    if not info:
+        i = get_image(uri, url)
+        info = { 'width': i.width, 'height': i.height, 'format': i.format }
 
     i = get_image(url, uri)
 
@@ -287,46 +304,54 @@ def hget(url, stream=False, auth=None):
     return r
 
 
+def get_info(url, uri=None, download=True):
+    print(f'get info: {url}', flush=True)
+    i=None
+
+    # if this is a file URL simply load the image
+    if url.startswith('file:'):
+        i = Image.open(url[7:])
+
+    try:
+        # attempt to peek information from first 50k of image
+        with closing(hget(url, stream=True)) as r:
+            r.raw.decode = True
+            b = r.raw.read(50*1024)
+            i = Image.open(BytesIO(b))
+    except:
+        if download:
+            # get the whole file, which might take some time
+            i = get_image(url, uri)
+
+    return { 'format': i.format, 'width': i.width, 'height': i.height } if i else None
+
+
 def get_image(url, uri=None):
     uri = uri or url
-    m = match(r'(^.*\.pdf):(\d+)$', url)
 
-    # PDF?
-    if m:
-        try:
-            # TODO: use credentials in config
-            r = htopen(m.group(1), mode='rb', auth=get_credentials(url))
-            pr = PdfFileReader(r)
+    print(f'get image: {url}', flush=True)
 
-            if pr.isEncrypted:
-                pr.decrypt('')
-
-            p = pr.getPage(int(m.group(2)))
-            pw = PdfFileWriter()
-            pw.addPage(p)
-            b = BytesIO()
-            pw.write(b)
-            b.seek(0)
-            i = convert_from_bytes(b.read())[0]
-        except (UnsupportedOperation,NotImplementedError) as e:
-            # download whole file
-            r  = htopen(m.group(1), mode='rb', auth=get_credentials(url))
-            i = convert_from_bytes(r.read(), 300, first_page=int(m.group(2)), last_page=int(m.group(2)), userpw='')[0]
-        except:
-            raise
+    if url.startswith('file:///'):
+        s = open(url[7:], mode='rb')
     else:
-        print(url, flush=True)
         req = hget(url, stream=True)
         req.raw.decode_stream=True
+        s = req.raw
 
-        if get_setting('cache_original', False):
-            print(f'caching original ({uri})', flush=True)
-            key = uri + ':original'
-            cache.set(key, req.raw)
-            i = Image.open(join(*cache.get_location(key)))
-        else:
-            b = req.raw.read()
-            i = Image.open(BytesIO(b))
+    if get_setting('cache_original', False) and not url.startswith('file:///'):
+        print(f'caching original ({uri})', flush=True)
+        key = uri + ':original'
+        cache.set(key, s)
+        i = Image.open(join(*cache.get_location(key)))
+    else:
+        b = s.read()
+        i = Image.open(BytesIO(b))
+
+    if get_setting('cache_full') and not url.startswith('file:///'):
+        # TODO file size sanity check
+        key = create_key(uri, 'full', 'max', '0', 'default', get_setting('cache_format', 'jpg'))
+        print(f'caching original ({key})', flush=True)
+        save_to_cache(key, i)
 
     return i
 
@@ -481,25 +506,6 @@ def do_quality(image, quality):
             image = image.filter(ImageFilter.FIND_EDGES)
 
     return image
-
-
-def get_info(url, uri=None):
-    # if this is a file URL simply load the image
-    if url.startswith('file:'):
-        i = Image.open(url[7:])
-        return { 'format': i.format, 'width': i.width, 'height': i.height }
-
-    try:
-        # attempt to peek information from first 50k of image
-        with closing(hget(url, stream=True)) as r:
-            r.raw.decode = True
-            b = r.raw.read(50*1024)
-            i = Image.open(BytesIO(b))
-
-            return { 'format': i.format, 'width': i.width, 'height': i.height }
-    except:
-        # get the whole file, which might take some time
-        return save(url, uri=uri)
 
 
 def crop_coords(info, region):
